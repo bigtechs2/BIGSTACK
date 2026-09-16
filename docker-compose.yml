@@ -1,0 +1,39 @@
+version: "3.9"
+
+services:
+    # ─── BIGSTACK Bot + API ─────────────────────
+    bot:
+        build: .
+        container_name: bigstack-bot
+        restart: unless-stopped
+        env_file:
+            - .env
+        ports:
+            - "3000:3000"
+        volumes:
+            - ./downloads:/app/downloads
+            - ./logs:/app/logs
+            - ./config.json:/app/config.json
+        depends_on:
+            - redis
+        networks:
+            - bigstack-net
+
+    # ─── Redis Cache (Optional but useful) ──────
+    redis:
+        image: redis:7-alpine
+        container_name: bigstack-redis
+        restart: unless-stopped
+        ports:
+            - "6379:6379"
+        volumes:
+            - redis-data:/data
+        networks:
+            - bigstack-net
+
+volumes:
+    redis-data:
+
+networks:
+    bigstack-net:
+        driver: bridge
