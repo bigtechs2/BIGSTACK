@@ -1,0 +1,229 @@
+{
+    "branding": {
+        "name": "BIGSTACK",
+        "tagline": "Media Downloader & Search Bot",
+        "footer": "© BIGSTACK by bigmanjtech™ with ♥",
+        "version": "1.0.0",
+        "logo": "src/assets/images/bigstack-logo.png",
+        "banner": "src/assets/images/bigstack-banner.png",
+        "thumbnail": "src/assets/images/bigstack-logo.png"
+    },
+
+    "owner": {
+        "username": "bigmanjtech",
+        "name": "bigmank",
+        "contact": "https://t.me/bigmanj09",
+        "channel": "https://t.me/bigst4ckhub"
+    },
+
+    "bot": {
+        "username": "BigStackBot",
+        "prefix": "/",
+        "defaultLanguage": "en",
+        "theme": "dark",
+        "timezone": "Africa/Dar_es_Salaam",
+        "thumbnail": "src/assets/images/bigstack-logo.png"
+    },
+
+    "webapp": {
+        "enabled": true,
+        "title": "BIGSTACK",
+        "shortName": "bigstack",
+        "themeColor": "#0f0f0f",
+        "backgroundColor": "#ffffff",
+        "path": "/webapp"
+    },
+
+    "features": {
+        "player": true,
+        "downloader": true,
+        "search": true,
+        "store": true,
+        "coins": true,
+        "premium": true,
+        "miniApp": true,
+        "forceJoin": true,
+        "dailyReward": true,
+        "referral": true,
+        "broadcast": true
+    },
+
+    "forceJoin": {
+        "enabled": true,
+        "strict": true,
+        "telegram": [
+            {
+                "name": "BIGSTACK Channel",
+                "id": "@bigst4ckhub",
+                "url": "https://t.me/bigst4ckhub"
+            },
+            {
+                "name": "BIGSTACK Support",
+                "id": "@bigst4ck_support",
+                "url": "https://t.me/bigst4ck_support"
+            }
+        ],
+        "whatsapp": [
+            {
+                "name": "BIGSTACK WhatsApp",
+                "url": "https://whatsapp.com/channel/0029Vb8VpyiK0IBkFiIslc0Y",
+                "verified": false
+            }
+        ]
+    },
+
+    "rewards": {
+        "daily": {
+            "enabled": true,
+            "coins": 50,
+            "premiumCoins": 150,
+            "cooldownHours": 24
+        },
+        "referral": {
+            "enabled": true,
+            "referrerBonus": 25,
+            "refereeBonus": 10
+        },
+        "start": {
+            "enabled": true,
+            "coins": 0
+        }
+    },
+
+    "coins": {
+        "currency": "Coins",
+        "emoji": "🪙",
+        "perCommand": {
+            "play": 10,
+            "video": 10,
+            "audio": 5,
+            "yt": 15,
+            "ytmp3": 10,
+            "ytmp4": 15,
+            "ig": 5,
+            "tt": 5,
+            "tw": 5,
+            "fb": 5,
+            "pin": 3,
+            "gdrive": 5,
+            "spotify": 10,
+            "search": 2,
+            "song": 3,
+            "movie": 3,
+            "tv": 3,
+            "anime": 3,
+            "manga": 3,
+            "image": 2,
+            "lyrics": 2
+        }
+    },
+
+    "premium": {
+        "enabled": true,
+        "prices": {
+            "weekly": 100,
+            "monthly": 300,
+            "yearly": 2500
+        },
+        "benefits": {
+            "dailyCoinsMultiplier": 3,
+            "noCooldown": true,
+            "noAds": true,
+            "priorityQueue": true,
+            "higherQuality": true,
+            "unlimitedDownloads": true
+        }
+    },
+
+    "limits": {
+        "maxFileSizeMB": 2000,
+        "downloadTimeoutSec": 120,
+        "apiTimeoutSec": 30,
+        "queueSize": 3,
+        "rateLimitPerMin": 10,
+        "cacheTTLMin": 15,
+        "maxSearchResults": 10,
+        "maxPlaylistSize": 50
+    },
+
+    "queue": {
+        "maxConcurrentDownloads": 3,
+        "maxConcurrentApiCalls": 10,
+        "retryAttempts": 2,
+        "retryDelayMs": 1000
+    },
+
+    "cache": {
+        "enabled": true,
+        "driver": "memory",
+        "ttl": {
+            "search": 600,
+            "download": 1800,
+            "user": 300
+        }
+    },
+
+    "database": {
+        "driver": "mongodb",
+        "url": "MONGO_URL_FROM_ENV",
+        "collections": {
+            "users": "users",
+            "chats": "chats",
+            "downloads": "downloads",
+            "searches": "searches",
+            "coins": "coins",
+            "premium": "premium",
+            "forceJoin": "force_join",
+            "sessions": "sessions",
+            "logs": "logs"
+        }
+    },
+
+    "logging": {
+        "level": "info",
+        "toFile": true,
+        "toConsole": true,
+        "files": {
+            "app": "logs/bigstack.log",
+            "error": "logs/error.log",
+            "download": "logs/download.log",
+            "command": "logs/command.log",
+            "api": "logs/api.log"
+        }
+    },
+
+    "messages": {
+        "footer": "© BIGSTACK by bigmanjtech™ with ♥",
+        "welcome": "🇼‌🇪‌🇱‌🇨‌🇴‌🇲‌🇪 𝐭𝐨 𝐁𝐈𝐆𝐒𝐓4𝐂𝐊 !\nYour all-in-one media downloader.",
+        "loading": "🇵‌🇱‌🇪‌🇦‌🇸‌🇪‌ 🇼‌🇦‌🇮‌🇹‌...",
+        "notFound": "nothing found!",
+        "error": "Something went wrong. Try again later.",
+        "rateLimited": "Too many requests. Please wait a minute.",
+        "noCoins": "🪙 You don't have enough coins.",
+        "forceJoinRequired": "You must join our channels to use BIGSTACK.",
+        "premiumOnly": "This command is for Premium users only.",
+        "adminOnly": "This command is for admins only.",
+        "ownerOnly": "This command is for the owner only."
+    },
+
+    "links": {
+        "support": "https://t.me/bigst4ckhub",
+        "channel": "https://t.me/bigst4ckhub",
+        "repo": "https://github.com/bigtech2/BIGSTACk",
+        "docs": "https://docs.bigstack.dev",
+        "website": "https://bigstack.dev"
+    },
+
+    "locales": {
+        "default": "en",
+        "available": ["en", "sw", "hi", "ar"]
+    },
+
+    "theme": {
+        "primary": "#00e5ff",
+        "secondary": "#a855f7",
+        "background": "#0f0f0f",
+        "text": "#f5f5f5",
+        "accent": "#ffd700"
+    }
+}
