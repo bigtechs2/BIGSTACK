@@ -7,12 +7,12 @@
 require("dotenv").config();
 
 // ─── Core modules ───────────────────────────────────
-const { Bot } = require("grammy");
 const chalk = require("chalk");
 
 // ─── Internal ───────────────────────────────────────
 const config = require("./config");
 const logger = require("./core/logger");
+const bot = require("./bot");
 const { connectDatabase } = require("./database/client");
 const { loadCommands } = require("./loader");
 const { loadMiddlewares } = require("./middlewares");
@@ -20,16 +20,28 @@ const { loadMiddlewares } = require("./middlewares");
 // ─── Banner ─────────────────────────────────────────
 function printBanner() {
     console.clear();
-    console.log(chalk.cyan(`
+    console.log(
+        chalk.cyan(`
    ██████╗ ██╗ ██████╗ ███████╗████████╗ █████╗  ██████╗██╗  ██╗
    ██╔══██╗██║██╔════╝ ██╔════╝╚══██╔══╝██╔══██╗██╔════╝██║ ██╔╝
-   ██████╔╝██║██║  ███╗███████╗   ██║   ███████║██║     █████╔╝ 
-   ██╔══██╗██║██║   ██║╚════██║   ██║   ██╔══██║██║     ██╔═██╗ 
+   ██████╔╝██║██║  ███╗███████╗   ██║   ███████║██║     █████╔╝
+   ██╔══██╗██║██║   ██║╚════██║   ██║   ██╔══██║██║     ██╔═██╗
    ██████╔╝██║╚██████╔╝███████║   ██║   ██║  ██║╚██████╗██║  ██╗
    ╚═════╝ ╚═╝ ╚═════╝ ╚══════╝   ╚═╝   ╚═╝  ╚═╝ ╚═════╝╚═╝  ╚═╝
-    `));
+    `)
+    );
     console.log(chalk.gray(`   ${config.branding.footer}\n`));
     console.log(chalk.green(`   ✦ Starting BIGSTACK v${config.branding.version}...\n`));
+}
+
+// ─── Validate environment variables ─────────────────
+function validateEnv() {
+    const required = ["BOT_TOKEN", "OWNER_ID", "MONGO_URL"];
+    const missing = required.filter((key) => !process.env[key]);
+
+    if (missing.length > 0) {
+        throw new Error(`Missing in .env: ${missing.join(", ")}`);
+    }
 }
 
 // ─── Startup sequence ───────────────────────────────
@@ -39,56 +51,52 @@ async function start() {
         printBanner();
 
         // ─── 2. Validate env ────────────────────────
-        if (!process.env.BOT_TOKEN) {
-            throw new Error("BOT_TOKEN is missing in .env");
-        }
-        if (!process.env.MONGO_URL) {
-            throw new Error("MONGO_URL is missing in .env");
-        }
+        validateEnv();
+        logger.info("✅ Environment variables validated");
 
         // ─── 3. Connect to MongoDB ──────────────────
         logger.info("Connecting to database...");
         await connectDatabase();
         logger.info("✅ Database connected");
 
-        // ─── 4. Create bot instance ─────────────────
-        const bot = new Bot(process.env.BOT_TOKEN);
-        logger.info(`✅ Bot instance created (@${config.bot.username})`);
-
-        // ─── 5. Load middlewares ────────────────────
+        // ─── 4. Load middlewares ────────────────────
         loadMiddlewares(bot);
         logger.info("✅ Middlewares loaded");
 
-        // ─── 6. Load commands ───────────────────────
+        // ─── 5. Load commands ───────────────────────
         await loadCommands(bot);
-        logger.info("✅ Commands loaded");
 
-        // ─── 7. Set bot commands in Telegram ────────
-        // (registered separately via scripts/setCommands.js)
-        // await bot.api.setMyCommands(config.bot.commands);
+        // ─── 6. Set bot commands in Telegram ────────
+        // (register via scripts/setCommands.js)
+        // await bot.api.setMyCommands([...]);
 
-        // ─── 8. Start polling ───────────────────────
+        // ─── 7. Start polling ───────────────────────
         bot.start({
             onStart: (botInfo) => {
+                logger.info("─────────────────────────────────────────");
                 logger.info(`🚀 BIGSTACK is online as @${botInfo.username}`);
                 logger.info(`👑 Owner: ${config.owner.username}`);
                 logger.info(`📦 Version: ${config.branding.version}`);
+                logger.info(`🌍 Environment: ${process.env.NODE_ENV || "development"}`);
+                logger.info("─────────────────────────────────────────");
             }
         });
 
-        // ─── 9. Graceful shutdown ───────────────────
-        setupShutdownHandlers(bot);
+        // ─── 8. Graceful shutdown ───────────────────
+        setupShutdownHandlers();
 
     } catch (err) {
-        console.error(chalk.red("❌ Failed to start BIGSTACK:"));
-        console.error(chalk.red(err.message));
-        if (err.stack) console.error(chalk.gray(err.stack));
+        console.error(chalk.red("\n❌ Failed to start BIGSTACK:"));
+        console.error(chalk.red(`   ${err.message}`));
+        if (err.stack && process.env.NODE_ENV === "development") {
+            console.error(chalk.gray(err.stack));
+        }
         process.exit(1);
     }
 }
 
 // ─── Graceful shutdown ──────────────────────────────
-function setupShutdownHandlers(bot) {
+function setupShutdownHandlers() {
     const shutdown = async (signal) => {
         logger.warn(`\n⚠️  ${signal} received. Shutting down BIGSTACK...`);
 
@@ -96,7 +104,7 @@ function setupShutdownHandlers(bot) {
             await bot.stop();
             logger.info("✅ Bot stopped");
         } catch (e) {
-            logger.error("Error stopping bot:", e);
+            logger.error("Error stopping bot:", e.message);
         }
 
         try {
@@ -104,20 +112,25 @@ function setupShutdownHandlers(bot) {
             await mongoose.connection.close();
             logger.info("✅ Database disconnected");
         } catch (e) {
-            logger.error("Error closing database:", e);
+            logger.error("Error closing database:", e.message);
         }
 
         logger.info("👋 Goodbye!");
         process.exit(0);
     };
 
+    // ─── Signals ───
     process.on("SIGINT", () => shutdown("SIGINT"));
     process.on("SIGTERM", () => shutdown("SIGTERM"));
-    process.on("unhandledRejection", (err) => {
-        logger.error("Unhandled Rejection:", err);
+
+    // ─── Runtime errors ───
+    process.on("unhandledRejection", (reason) => {
+        logger.error("💥 Unhandled Rejection:", reason);
     });
+
     process.on("uncaughtException", (err) => {
-        logger.error("Uncaught Exception:", err);
+        logger.error("💥 Uncaught Exception:", err.message);
+        if (err.stack) logger.error(err.stack);
     });
 }
 
