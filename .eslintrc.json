@@ -1,0 +1,47 @@
+{
+    "env": {
+        "node": true,
+        "es2022": true,
+        "commonjs": true
+    },
+
+    "parserOptions": {
+        "ecmaVersion": 2022,
+        "sourceType": "commonjs"
+    },
+
+    "extends": [
+        "eslint:recommended"
+    ],
+
+    "rules": {
+        "no-unused-vars": ["warn", { "argsIgnorePattern": "^_" }],
+        "no-undef": "error",
+        "no-console": "off",
+        "no-empty": "warn",
+        "no-extra-semi": "warn",
+        "no-unreachable": "error",
+        "no-dupe-keys": "error",
+        "no-duplicate-case": "error",
+        "no-unexpected-multiline": "error",
+
+        "eqeqeq": ["warn", "smart"],
+        "curly": ["warn", "multi-line"],
+        "semi": ["warn", "always"],
+        "quotes": ["warn", "double", { "allowTemplateLiterals": true }],
+        "indent": ["warn", 4],
+
+        "no-var": "error",
+        "prefer-const": "warn",
+        "prefer-template": "warn"
+    },
+
+    "ignorePatterns": [
+        "node_modules/",
+        "downloads/",
+        "logs/",
+        "dist/",
+        "build/",
+        "webapp/"
+    ]
+}
