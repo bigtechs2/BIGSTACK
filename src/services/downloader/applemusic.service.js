@@ -1,0 +1,137 @@
+// ──────────────────────────────────────────────────
+//  BIGSTACK — Apple Music Service
+//  Download Apple Music tracks as MP3
+//  © BIGSTACK by bigmanjtech™ with ♥︎
+// ──────────────────────────────────────────────────
+
+const axios = require("axios");
+const config = require("../../config");
+const logger = require("../../core/logger");
+const cache = require("../../core/cache");
+
+// ─── Helper: nested field access ────────────────────
+function getField(obj, path) {
+    if (!path || !obj) return undefined;
+    return path.split(".").reduce((acc, key) => acc?.[key], obj);
+}
+
+// ─── Helper: normalize duration to seconds ──────────
+function normalizeDuration(dur) {
+    if (!dur) return 0;
+    if (typeof dur === "number") return dur;
+    if (typeof dur === "string") {
+        // Handle "1m 23s" format
+        const mMatch = dur.match(/(\d+)\s*m/);
+        const sMatch = dur.match(/(\d+)\s*s/);
+        if (mMatch || sMatch) {
+            const mins = mMatch ? parseInt(mMatch[1]) : 0;
+            const secs = sMatch ? parseInt(sMatch[1]) : 0;
+            return mins * 60 + secs;
+        }
+        // Handle "1:23" format
+        if (dur.includes(":")) {
+            const parts = dur.split(":").map(Number);
+            if (parts.length === 2) return parts[0] * 60 + parts[1];
+            if (parts.length === 3) return parts[0] * 3600 + parts[1] * 60 + parts[2];
+        }
+    }
+    return parseInt(dur) || 0;
+}
+
+// ─── Extract Apple Music ID from URL ────────────────
+function extractAppleId(url) {
+    if (!url) return null;
+    // Match album or song IDs
+    const albumMatch = url.match(/music\.apple\.com\/.*\/album\/.*\/(\d+)/);
+    const songMatch = url.match(/music\.apple\.com\/.*\/song\/.*\/(\d+)/);
+    const idMatch = url.match(/music\.apple\.com\/.*\/(\d+)/);
+    return albumMatch?.[1] || songMatch?.[1] || idMatch?.[1] || null;
+}
+
+// ─── Main download function ─────────────────────────
+async function download(url) {
+    // ─── 1. Validate input ──────────────────────────
+    if (!url || typeof url !== "string") {
+        throw new Error("URL is required");
+    }
+
+    if (!config.siteMap.isSupported(url) || config.siteMap.getPlatform(url) !== "apple music") {
+        throw new Error("Invalid Apple Music URL");
+    }
+
+    const appleId = extractAppleId(url);
+    if (!appleId) {
+        throw new Error("Could not extract Apple Music ID");
+    }
+
+    // ─── 2. Check cache ─────────────────────────────
+    const cacheKey = `applemusic:${appleId}`;
+    const cached = await cache.get(cacheKey);
+    if (cached) {
+        logger.info(`[applemusic] ✅ cache hit for ${appleId}`);
+        return cached;
+    }
+
+    // ─── 3. Get providers ───────────────────────────
+    const providers = config.getProviders("applemusic");
+    logger.info(`[applemusic] processing ${appleId} across ${providers.length} providers`);
+
+    let lastError = null;
+
+    // ─── 4. Try each provider ───────────────────────
+    for (const provider of providers) {
+        try {
+            logger.info(`[applemusic] trying ${provider.name}...`);
+
+            const { data } = await axios.get(provider.url, {
+                params: { [provider.param]: url },
+                timeout: provider.timeout || 45000
+            });
+
+            // ─── Check success ──────────────────────
+            const successPath = provider.fields.success;
+            const isSuccess = successPath ? getField(data, successPath) : true;
+            if (!isSuccess) {
+                throw new Error("Response reported failure");
+            }
+
+            // ─── Get download URL ───────────────────
+            const downloadUrl = getField(data, provider.fields.download);
+            if (!downloadUrl) {
+                throw new Error("No download URL in response");
+            }
+
+            // ─── Build result ───────────────────────
+            const result = {
+                provider: provider.name,
+                title: getField(data, provider.fields.title) || "Unknown Title",
+                channel: getField(data, provider.fields.channel) || "Unknown Artist",
+                thumbnail: getField(data, provider.fields.thumbnail) || null,
+                duration: normalizeDuration(getField(data, provider.fields.duration)),
+                videoUrl: getField(data, provider.fields.videoUrl) || url,
+                download: downloadUrl,
+                format: "mp3",
+                appleId,
+                raw: data
+            };
+
+            logger.info(`[applemusic] ✅ ${provider.name} succeeded: "${result.title}"`);
+
+            // ─── Cache 30 min ───────────────────────
+            await cache.set(cacheKey, result, config.constants.CACHE_TTL.DOWNLOAD);
+
+            return result;
+
+        } catch (err) {
+            const msg = err.response ? `HTTP ${err.response.status}` : err.message;
+            logger.warn(`[applemusic] ❌ ${provider.name} failed: ${msg}`);
+            lastError = err;
+            continue;
+        }
+    }
+
+    throw lastError || new Error("All applemusic providers failed");
+}
+
+// ─── Export ─────────────────────────────────────────
+module.exports = { download };
