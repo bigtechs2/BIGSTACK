@@ -10,9 +10,10 @@ const axios = require("axios");
 const config = require("../../config");
 const logger = require("../../core/logger");
 const services = require("../../services/downloader");
+const { startProgress } = require("../../utils/progress");
 
-// ─── Max size to send via Telegram (20MB) ───────────
-const MAX_SEND_SIZE = 20 * 1024 * 1024;
+// ─── Max size to send via Telegram (from config) ────
+const MAX_SEND_SIZE = (config.limits?.maxSendSizeMB || 30) * 1024 * 1024;
 
 module.exports = {
     // ─── Metadata ───────────────────────────────────
@@ -56,11 +57,13 @@ module.exports = {
             });
         }
 
-        // ─── 3. Send loading ────────────────────────
-        const loading = await ctx.reply(
-            `⏳ *Processing...*\n\nFetching from MediaFire...`,
-            { parse_mode: "Markdown" }
-        );
+        // ─── 3. Start live progress ─────────────────
+        const progress = await startProgress(ctx, {
+            emoji: "🔥",
+            title: "Fetching from MediaFire...",
+            command: "mediafire",
+            input: url
+        });
 
         try {
             // ─── 4. Chat action ─────────────────────
@@ -70,35 +73,31 @@ module.exports = {
             logger.info(`[/mediafire] user ${ctx.from.id} requesting ${url}`);
             const result = await services.mediafire.download(url);
 
-            // ─── 6. Size check ──────────────────────
+            // ─── 6. Update progress with info ───────
+            progress.setProvider(result.provider);
+            progress.setTitle(`${result.filename}`);
+
+            // ─── 7. Size check → too large ──────────
             if (result.size > MAX_SEND_SIZE) {
-                await ctx.api.editMessageText(
-                    ctx.chat.id,
-                    loading.message_id,
-                    `🔥 *${result.filename}*\n\n` +
+                const sizeLimitMB = Math.round(MAX_SEND_SIZE / (1024 * 1024));
+
+                await progress.finish({
+                    success: true,
+                    title: "File Ready (Too Large)",
+                    extra:
                         `📏 *Size:* ${result.sizeFormatted}\n` +
                         `🏷 *Type:* ${result.type}\n` +
-                        `⚠️ *Too large for Telegram* (limit: 20MB)\n\n` +
-                        `🔗 [Download Link](${result.download})\n\n` +
-                        `📡 *Provider:* ${result.provider}`,
-                    { parse_mode: "Markdown", disable_web_page_preview: true }
-                );
+                        (result.uploaded ? `📅 *Uploaded:* ${result.uploaded}\n` : "") +
+                        `⚠️ _Too large for Telegram_ (limit: ${sizeLimitMB}MB)\n\n` +
+                        `🔗 [Download Link](${result.download})`
+                });
                 return;
             }
 
-            // ─── 7. Update loading ──────────────────
-            await ctx.api.editMessageText(
-                ctx.chat.id,
-                loading.message_id,
-                `🔥 *${result.filename}*\n\n` +
-                    `📏 *Size:* ${result.sizeFormatted}\n` +
-                    `🏷 *Type:* ${result.type}\n` +
-                    `📡 *Provider:* ${result.provider}\n\n` +
-                    `📥 Downloading...`,
-                { parse_mode: "Markdown" }
-            );
+            // ─── 8. Update progress → downloading ───
+            progress.setTitle("Downloading file...");
 
-            // ─── 8. Download buffer ─────────────────
+            // ─── 9. Download buffer ─────────────────
             logger.info(`[/mediafire] downloading ${result.filename} (${result.sizeFormatted})...`);
             const fileRes = await axios.get(result.download, {
                 responseType: "arraybuffer",
@@ -107,24 +106,29 @@ module.exports = {
                 maxBodyLength: Infinity,
                 headers: {
                     "User-Agent":
-                        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
+                        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+                    "Referer": "https://www.mediafire.com/"
                 }
             });
             const fileBuffer = Buffer.from(fileRes.data);
 
-            // ─── 9. Build caption ───────────────────
+            // ─── 10. Build caption ──────────────────
             const caption =
                 `🔥 *${result.filename}*\n\n` +
                 `📏 *Size:* ${result.sizeFormatted}\n` +
                 `📡 *Provider:* ${result.provider}`;
 
-            // ─── 10. Send based on type ─────────────
+            // ─── 11. Send based on type ─────────────
             await sendByType(ctx, result, fileBuffer, caption);
 
-            // ─── 11. Clean up ───────────────────────
-            await ctx.api
-                .deleteMessage(ctx.chat.id, loading.message_id)
-                .catch(() => {});
+            // ─── 12. Final success ──────────────────
+            await progress.finish({
+                success: true,
+                title: "File Sent!",
+                extra:
+                    `📏 *Size:* ${result.sizeFormatted}\n` +
+                    `🏷 *Type:* ${result.type}`
+            });
 
             logger.info(`[/mediafire] ✅ sent ${result.filename} to ${ctx.from.id}`);
 
@@ -133,13 +137,12 @@ module.exports = {
 
             const errorText = getErrorMessage(error);
 
-            await ctx.api
-                .editMessageText(ctx.chat.id, loading.message_id, errorText, {
-                    parse_mode: "Markdown"
-                })
-                .catch(() => {
-                    ctx.reply(errorText, { parse_mode: "Markdown" });
-                });
+            // ─── Final error ────────────────────────
+            await progress.finish({
+                success: false,
+                title: "Download Failed",
+                extra: errorText
+            });
         }
     }
 };
@@ -150,6 +153,7 @@ async function sendByType(ctx, result, buffer, caption) {
     const name = filename || "file";
 
     try {
+        // 🖼️ Image → send as photo
         if (type === "image") {
             return await ctx.replyWithPhoto(new InputFile(buffer, name), {
                 caption,
@@ -157,6 +161,7 @@ async function sendByType(ctx, result, buffer, caption) {
             });
         }
 
+        // 🎬 Video → send as video
         if (type === "video") {
             return await ctx.replyWithVideo(new InputFile(buffer, name), {
                 caption,
@@ -165,6 +170,7 @@ async function sendByType(ctx, result, buffer, caption) {
             });
         }
 
+        // 🎵 Audio → send as audio
         if (type === "audio") {
             return await ctx.replyWithAudio(new InputFile(buffer, name), {
                 caption,
@@ -174,7 +180,7 @@ async function sendByType(ctx, result, buffer, caption) {
             });
         }
 
-        // Everything else (zip, pdf, doc, etc.) → document
+        // 📄 Everything else (zip, pdf, doc, etc.) → document
         return await ctx.replyWithDocument(new InputFile(buffer, name), {
             caption,
             parse_mode: "Markdown"
@@ -183,6 +189,7 @@ async function sendByType(ctx, result, buffer, caption) {
     } catch (err) {
         logger.warn(`[/mediafire] sendByType failed (${type}): ${err.message}`);
 
+        // Fallback: try as document
         try {
             return await ctx.replyWithDocument(new InputFile(buffer, name), {
                 caption,
@@ -198,7 +205,7 @@ async function sendByType(ctx, result, buffer, caption) {
 // ─── Friendly errors ────────────────────────────────
 function getErrorMessage(error) {
     if (error.message?.includes("All mediafire providers failed")) {
-        return "❌ *Download failed.*\n\nThe file might be private or the link is invalid.";
+        return "❌ *Download failed.*\n\nThe file might be deleted or the link is invalid.";
     }
     if (error.message?.includes("Invalid MediaFire URL")) {
         return "❌ *Invalid MediaFire URL.*";
@@ -211,6 +218,9 @@ function getErrorMessage(error) {
     }
     if (error.code === "ECONNABORTED") {
         return "⌛ *Download timeout.*\n\nThe file is too large or connection is slow.";
+    }
+    if (error.message?.includes("request entity too large")) {
+        return "❌ *File too large for Telegram.*";
     }
     return "❌ *Something went wrong.*\n\nPlease try again later.";
 }
