@@ -10,6 +10,7 @@ const axios = require("axios");
 const config = require("../../config");
 const logger = require("../../core/logger");
 const services = require("../../services/downloader");
+const { startProgress } = require("../../utils/progress");
 
 module.exports = {
     // ─── Metadata ───────────────────────────────────
@@ -53,11 +54,13 @@ module.exports = {
             });
         }
 
-        // ─── 3. Send loading ────────────────────────
-        const loading = await ctx.reply(
-            `⏳ *Processing...*\n\nFetching from Instagram...`,
-            { parse_mode: "Markdown" }
-        );
+        // ─── 3. Start live progress ─────────────────
+        const progress = await startProgress(ctx, {
+            emoji: "📸",
+            title: "Fetching from Instagram...",
+            command: "instagram",
+            input: url
+        });
 
         try {
             // ─── 4. Chat action ─────────────────────
@@ -67,30 +70,26 @@ module.exports = {
             logger.info(`[/instagram] user ${ctx.from.id} requesting ${url}`);
             const result = await services.instagram.download(url);
 
-            // ─── 6. Update loading message ──────────
-            await ctx.api.editMessageText(
-                ctx.chat.id,
-                loading.message_id,
-                `📸 *Instagram ${capitalize(result.type)}*\n\n` +
-                    `📦 *Items:* ${result.count}\n` +
-                    `📡 *Provider:* ${result.provider}\n\n` +
-                    `📥 Downloading...`,
-                { parse_mode: "Markdown" }
+            // ─── 6. Update progress with info ───────
+            progress.setProvider(result.provider);
+            progress.setTitle(
+                `Downloading ${result.count} item${result.count > 1 ? "s" : ""}...`
             );
 
             // ─── 7. Download all media buffers ──────
             logger.info(`[/instagram] downloading ${result.count} item(s)...`);
-            const buffers = await downloadAll(result.items);
+            const buffers = await downloadAll(result.items, progress);
+
+            if (buffers.length === 0) {
+                throw new Error("All media items failed to download");
+            }
 
             // ─── 8. Send based on count ─────────────
             if (buffers.length === 1) {
-                // Single item
                 await sendSingle(ctx, buffers[0], result);
             } else if (buffers.length > 1 && buffers.length <= 10) {
-                // Multiple items (media group)
                 await sendMediaGroup(ctx, buffers, result);
             } else {
-                // More than 10 — send first 10 as group, rest as separate files
                 const first10 = buffers.slice(0, 10);
                 await sendMediaGroup(ctx, first10, result);
 
@@ -99,31 +98,37 @@ module.exports = {
                 }
             }
 
-            // ─── 9. Clean up loading ────────────────
-            await ctx.api
-                .deleteMessage(ctx.chat.id, loading.message_id)
-                .catch(() => {});
+            // ─── 9. Final success ───────────────────
+            await progress.finish({
+                success: true,
+                title: "Sent!",
+                extra:
+                    `📸 Instagram ${capitalize(result.type)}\n` +
+                    `📦 *Items:* ${buffers.length}/${result.count}`
+            });
 
-            logger.info(`[/instagram] ✅ sent ${result.count} item(s) to ${ctx.from.id}`);
+            logger.info(`[/instagram] ✅ sent ${buffers.length} item(s) to ${ctx.from.id}`);
 
         } catch (error) {
             logger.error(`[/instagram] failed: ${error.message}`);
 
             const errorText = getErrorMessage(error);
 
-            await ctx.api
-                .editMessageText(ctx.chat.id, loading.message_id, errorText, {
-                    parse_mode: "Markdown"
-                })
-                .catch(() => {
-                    ctx.reply(errorText, { parse_mode: "Markdown" });
-                });
+            // ─── Final error ────────────────────────
+            await progress.finish({
+                success: false,
+                title: "Download Failed",
+                extra: errorText
+            });
         }
     }
 };
 
 // ─── Download all buffers in parallel ───────────────
-async function downloadAll(items) {
+async function downloadAll(items, progress) {
+    let done = 0;
+    const total = items.length;
+
     const promises = items.map(async (item, i) => {
         try {
             const res = await axios.get(item.url, {
@@ -136,6 +141,14 @@ async function downloadAll(items) {
                         "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
                 }
             });
+
+            done++;
+
+            // Update progress title with item count
+            if (progress && total > 1) {
+                progress.setTitle(`Downloading ${done}/${total} items...`);
+            }
+
             return {
                 type: item.type,
                 buffer: Buffer.from(res.data),
@@ -212,6 +225,9 @@ function capitalize(str) {
 function getErrorMessage(error) {
     if (error.message?.includes("All instagram providers failed")) {
         return "❌ *Download failed.*\n\nThis post might be private or unavailable.";
+    }
+    if (error.message?.includes("All media items failed")) {
+        return "❌ *Download failed.*\n\nCould not fetch any media items.";
     }
     if (error.message?.includes("Invalid Instagram URL")) {
         return "❌ *Invalid Instagram URL.*";
