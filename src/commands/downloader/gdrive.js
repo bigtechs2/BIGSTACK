@@ -12,8 +12,8 @@ const logger = require("../../core/logger");
 const services = require("../../services/downloader");
 const { startProgress } = require("../../utils/progress");
 
-// ─── Max size to send via Telegram (20MB) ───────────
-const MAX_SEND_SIZE = 20 * 1024 * 1024;
+// ─── Max size to send via Telegram (30MB) ───────────
+const MAX_SEND_SIZE = 30 * 1024 * 1024;
 
 module.exports = {
     // ─── Metadata ───────────────────────────────────
@@ -85,7 +85,7 @@ module.exports = {
                     extra:
                         `📏 *Size:* ${result.sizeFormatted}\n` +
                         `🏷 *Type:* ${result.type}\n` +
-                        `⚠️ _Too large for Telegram_ (limit: 20MB)\n\n` +
+                        `⚠️ _Too large for Telegram_ (limit: 30MB)\n\n` +
                         `🔗 [Download Link](${result.download})`
                 });
                 return;
@@ -214,6 +214,9 @@ function getErrorMessage(error) {
     }
     if (error.code === "ECONNABORTED") {
         return "⌛ *Download timeout.*\n\nThe file is too large or connection is slow.";
+    }
+    if (error.message?.includes("request entity too large")) {
+        return "❌ *File too large for Telegram.*\n\nTelegram's limit is 50MB.";
     }
     return "❌ *Something went wrong.*\n\nPlease try again later.";
 }
