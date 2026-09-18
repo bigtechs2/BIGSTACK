@@ -10,6 +10,7 @@ const axios = require("axios");
 const config = require("../../config");
 const logger = require("../../core/logger");
 const services = require("../../services/downloader");
+const { startProgress } = require("../../utils/progress");
 
 module.exports = {
     // ─── Metadata ───────────────────────────────────
@@ -53,11 +54,13 @@ module.exports = {
             });
         }
 
-        // ─── 3. Send loading ────────────────────────
-        const loading = await ctx.reply(
-            `⏳ *Processing...*\n\nFetching from Facebook...`,
-            { parse_mode: "Markdown" }
-        );
+        // ─── 3. Start live progress ─────────────────
+        const progress = await startProgress(ctx, {
+            emoji: "📘",
+            title: "Fetching Facebook video...",
+            command: "facebook",
+            input: url
+        });
 
         try {
             // ─── 4. Chat action ─────────────────────
@@ -67,16 +70,9 @@ module.exports = {
             logger.info(`[/facebook] user ${ctx.from.id} requesting ${url}`);
             const result = await services.facebook.download(url);
 
-            // ─── 6. Update loading ──────────────────
-            await ctx.api.editMessageText(
-                ctx.chat.id,
-                loading.message_id,
-                `📘 *${result.title}*\n\n` +
-                    `🎞 *Quality:* ${result.quality.toUpperCase()}\n` +
-                    `📡 *Provider:* ${result.provider}\n\n` +
-                    `📥 Downloading video...`,
-                { parse_mode: "Markdown" }
-            );
+            // ─── 6. Update progress with provider ───
+            progress.setProvider(result.provider);
+            progress.setTitle(`Downloading ${result.quality.toUpperCase()} video...`);
 
             // ─── 7. Download buffer ─────────────────
             logger.info(`[/facebook] downloading ${result.quality} from ${result.provider}...`);
@@ -111,10 +107,12 @@ module.exports = {
                 }
             );
 
-            // ─── 10. Clean up ───────────────────────
-            await ctx.api
-                .deleteMessage(ctx.chat.id, loading.message_id)
-                .catch(() => {});
+            // ─── 10. Final success ──────────────────
+            await progress.finish({
+                success: true,
+                title: "Video Sent!",
+                extra: `🎞 ${result.quality.toUpperCase()} · ${truncate(result.title, 50)}`
+            });
 
             logger.info(`[/facebook] ✅ sent to ${ctx.from.id}`);
 
@@ -123,13 +121,12 @@ module.exports = {
 
             const errorText = getErrorMessage(error);
 
-            await ctx.api
-                .editMessageText(ctx.chat.id, loading.message_id, errorText, {
-                    parse_mode: "Markdown"
-                })
-                .catch(() => {
-                    ctx.reply(errorText, { parse_mode: "Markdown" });
-                });
+            // ─── Final error ────────────────────────
+            await progress.finish({
+                success: false,
+                title: "Download Failed",
+                extra: errorText
+            });
         }
     }
 };
@@ -144,6 +141,12 @@ function formatDuration(seconds) {
         return `${h}:${m.toString().padStart(2, "0")}:${s.toString().padStart(2, "0")}`;
     }
     return `${m}:${s.toString().padStart(2, "0")}`;
+}
+
+function truncate(str, max = 50) {
+    if (!str) return "";
+    const s = String(str);
+    return s.length > max ? s.slice(0, max - 3) + "..." : s;
 }
 
 function getErrorMessage(error) {
