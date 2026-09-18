@@ -6,114 +6,89 @@
 //    • Hourly stats report → STATS group
 //    • Daily stats summary → STATS group
 //    • Temp file cleanup
-//    • Session cleanup
-//    • Cache flush
+//    • Log rotation
+//    • Cache monitoring
+//    • Premium auto-expire
+//    • Command stat cleanup
 // ──────────────────────────────────────────────────
 
 const cron = require("node-cron");
 const fs = require("fs");
 const path = require("path");
 
-const env = require("../config/env");
-const branding = require("../config/branding");
 const logger = require("./logger");
 const cache = require("./cache");
+const statsTracker = require("./statsTracker");
+const branding = require("../config/branding");
 
 // ─── Track running jobs (for graceful shutdown) ─────
 const jobs = [];
 
-// ─── Check if scheduler is enabled ──────────────────
+// ─── Read config ────────────────────────────────────
 const statsGroups = branding.logging?.groups?.stats || {};
-const isStatsEnabled = statsGroups.id && branding.logging?.groups?.enabled;
+const isStatsEnabled = !!(statsGroups.id && branding.logging?.groups?.enabled);
 const statsInterval = statsGroups.interval || "hourly";
 
-// ─── Stats accumulator (in-memory, resets on send) ──
-const statsBuffer = {
-    commands: {},     // { "play": 45, "ytmp3": 32 }
-    users: new Set(), // unique user IDs
-    downloads: 0,
-    errors: 0,
-    newUsers: 0,
-    startedAt: Date.now()
-};
-
 // ══════════════════════════════════════════════════
-//  📊 STATS BUFFER — called by other modules
+//  📊 TRACKERS — thin wrappers around statsTracker
 // ══════════════════════════════════════════════════
 
 function trackCommand(name, userId) {
-    if (!name) return;
-    statsBuffer.commands[name] = (statsBuffer.commands[name] || 0) + 1;
-    if (userId) statsBuffer.users.add(String(userId));
+    statsTracker.trackCommand({ from: { id: userId }, commandName: name, chat: {} }, { success: true });
 }
 
 function trackDownload(userId) {
-    statsBuffer.downloads++;
-    if (userId) statsBuffer.users.add(String(userId));
+    statsTracker.trackDownload({ from: { id: userId } });
 }
 
 function trackError() {
-    statsBuffer.errors++;
+    statsTracker.trackError();
 }
 
 function trackNewUser(userId) {
-    statsBuffer.newUsers++;
-    if (userId) statsBuffer.users.add(String(userId));
+    statsTracker.trackNewUser({ from: { id: userId } });
 }
 
 // ══════════════════════════════════════════════════
 //  📤 SEND STATS REPORT
 // ══════════════════════════════════════════════════
 
-async function sendStatsReport(periodLabel) {
+async function sendStatsReport(periodLabel = "Hourly Report") {
     if (!isStatsEnabled) return;
 
-    // Snapshot current buffer
-    const topCommands = Object.entries(statsBuffer.commands)
-        .sort(([, a], [, b]) => b - a)
-        .map(([name, count]) => ({ name, count }))
-        .slice(0, 10);
-
-    const activeUsers = statsBuffer.users.size;
-
-    // Skip if nothing happened
-    const totalCommands = Object.values(statsBuffer.commands).reduce((a, b) => a + b, 0);
-    if (totalCommands === 0 && statsBuffer.downloads === 0 && statsBuffer.errors === 0) {
-        logger.info(`[scheduler] ${periodLabel} report skipped — no activity`);
-        return;
-    }
-
-    const report = {
-        title: periodLabel.toUpperCase(),
-        period: periodLabel,
-        topCommands,
-        activeUsers,
-        downloads: statsBuffer.downloads,
-        errors: statsBuffer.errors,
-        newUsers: statsBuffer.newUsers
-    };
-
     try {
-        await logger.stats(report);
-        logger.info(`[scheduler] ✅ ${periodLabel} report sent to STATS group`);
-    } catch (err) {
-        logger.warn(`[scheduler] ❌ Failed to send ${periodLabel} report: ${err.message}`);
-    }
+        // Build report from statsTracker's buffer
+        const report = await statsTracker.buildReport(periodLabel);
 
-    // Reset buffer
-    statsBuffer.commands = {};
-    statsBuffer.users.clear();
-    statsBuffer.downloads = 0;
-    statsBuffer.errors = 0;
-    statsBuffer.newUsers = 0;
-    statsBuffer.startedAt = Date.now();
+        // Skip empty reports
+        const totalCommands = report.topCommands.reduce((a, c) => a + c.count, 0);
+        if (
+            totalCommands === 0 &&
+            report.downloads === 0 &&
+            report.errors === 0 &&
+            report.newUsers === 0
+        ) {
+            logger.debug(`[scheduler] ${periodLabel} — no activity, skipping`);
+            return;
+        }
+
+        // Send to STATS group
+        await logger.stats(report);
+        logger.info(`[scheduler] ✅ ${periodLabel} sent to STATS group`);
+
+        // Reset the buffer for the next period
+        statsTracker.resetBuffer();
+
+    } catch (err) {
+        logger.warn(`[scheduler] ❌ ${periodLabel} failed: ${err.message}`);
+    }
 }
 
 // ══════════════════════════════════════════════════
 //  🧹 CLEANUP JOBS
 // ══════════════════════════════════════════════════
 
-// ─── Clean temp files older than X hours ────────────
+// ─── Clean temp files older than 2 hours ────────────
 async function cleanTempFiles() {
     const tempDirs = [
         path.resolve(__dirname, "../../downloads/temp"),
@@ -155,7 +130,7 @@ async function cleanTempFiles() {
     }
 }
 
-// ─── Rotate log files (truncate if too large) ───────
+// ─── Rotate log files (truncate if > 10MB) ──────────
 async function rotateLogs() {
     const logsDir = path.resolve(__dirname, "../../logs");
     if (!fs.existsSync(logsDir)) return;
@@ -171,7 +146,6 @@ async function rotateLogs() {
             const stat = fs.statSync(filePath);
 
             if (stat.size > MAX_LOG_SIZE) {
-                // Truncate — keep last 1000 lines is complex, so just truncate
                 fs.writeFileSync(filePath, "");
                 logger.info(`[scheduler] 📄 rotated log: ${file}`);
             }
@@ -181,14 +155,33 @@ async function rotateLogs() {
     }
 }
 
-// ─── Flush expired cache entries ────────────────────
-async function flushCache() {
+// ─── Log cache stats ────────────────────────────────
+async function checkCache() {
     try {
         const stats = cache.getStats();
-        // Node-cache auto-expires; this just logs the size
-        logger.debug(`[scheduler] cache stats: ${stats.keys} keys, hit rate ${stats.hitRate}`);
+        logger.debug(`[scheduler] cache: ${stats.keys} keys, hit rate ${stats.hitRate}`);
     } catch (err) {
-        logger.warn(`[scheduler] cache flush check failed: ${err.message}`);
+        logger.warn(`[scheduler] cache check failed: ${err.message}`);
+    }
+}
+
+// ─── Expire old premium + clean stats ───────────────
+async function cleanupDatabase() {
+    try {
+        // Expire premium
+        const User = require("../database/models/User");
+        const expired = await User.expirePremium();
+        if (expired > 0) {
+            logger.info(`[scheduler] 💎 expired premium for ${expired} user(s)`);
+        }
+
+        // Clean old command stats (older than 90 days)
+        const removed = await statsTracker.cleanupOldStats(90);
+        if (removed > 0) {
+            logger.info(`[scheduler] 📊 removed ${removed} old stat record(s)`);
+        }
+    } catch (err) {
+        logger.warn(`[scheduler] DB cleanup failed: ${err.message}`);
     }
 }
 
@@ -196,15 +189,21 @@ async function flushCache() {
 //  ⏰ JOB REGISTRATION
 // ══════════════════════════════════════════════════
 
-function registerJob(name, schedule, fn) {
+function registerJob(name, schedule, fn, options = {}) {
     try {
-        const job = cron.schedule(schedule, async () => {
-            try {
-                await fn();
-            } catch (err) {
-                logger.error(`[scheduler] job "${name}" failed: ${err.message}`);
+        const job = cron.schedule(
+            schedule,
+            async () => {
+                try {
+                    await fn();
+                } catch (err) {
+                    logger.error(`[scheduler] job "${name}" failed: ${err.message}`);
+                }
+            },
+            {
+                timezone: options.timezone || branding.bot?.timezone || "UTC"
             }
-        });
+        );
 
         jobs.push({ name, job });
         logger.info(`[scheduler] ✅ registered: ${name} (${schedule})`);
@@ -216,40 +215,37 @@ function registerJob(name, schedule, fn) {
 }
 
 // ══════════════════════════════════════════════════
-//  🚀 START SCHEDULER
+//  🚀 START
 // ══════════════════════════════════════════════════
 
 function start() {
     logger.info("─────────────────────────────────────────────");
     logger.info("[scheduler] starting background jobs...");
 
-    // ─── Hourly stats report (default) ──────────────
+    // ─── Stats reports ──────────────────────────────
     if (isStatsEnabled) {
-        if (statsInterval === "hourly") {
+        if (statsInterval === "hourly" || statsInterval === "both") {
             registerJob("hourly-stats", "0 * * * *", () => sendStatsReport("Hourly Report"));
-        } else if (statsInterval === "daily") {
-            registerJob("daily-stats", "0 0 * * *", () => sendStatsReport("Daily Report"));
-        } else if (statsInterval === "both") {
-            registerJob("hourly-stats", "0 * * * *", () => sendStatsReport("Hourly Report"));
+        }
+        if (statsInterval === "daily" || statsInterval === "both") {
             registerJob("daily-stats", "0 0 * * *", () => sendStatsReport("Daily Report"));
         }
+    } else {
+        logger.info("[scheduler] stats reports disabled");
     }
 
-    // ─── Temp file cleanup — every 30 minutes ───────
+    // ─── Cleanup jobs ───────────────────────────────
     registerJob("cleanup-temp", "*/30 * * * *", cleanTempFiles);
-
-    // ─── Log rotation — every 6 hours ───────────────
     registerJob("rotate-logs", "0 */6 * * *", rotateLogs);
-
-    // ─── Cache stats check — every hour ─────────────
-    registerJob("cache-check", "15 * * * *", flushCache);
+    registerJob("cache-check", "15 * * * *", checkCache);
+    registerJob("db-cleanup", "0 4 * * *", cleanupDatabase); // daily at 4 AM
 
     logger.info(`[scheduler] ✅ ${jobs.length} job(s) running`);
     logger.info("─────────────────────────────────────────────");
 }
 
 // ══════════════════════════════════════════════════
-//  🛑 STOP SCHEDULER
+//  🛑 STOP
 // ══════════════════════════════════════════════════
 
 function stop() {
@@ -275,11 +271,13 @@ function stop() {
 module.exports = {
     start,
     stop,
-    // Trackers (called by other modules)
+
+    // Trackers (used by userLogger middleware)
     trackCommand,
     trackDownload,
     trackError,
     trackNewUser,
-    // Manual trigger (for testing)
+
+    // Manual trigger (for /stats command or testing)
     sendStatsReport
 };
