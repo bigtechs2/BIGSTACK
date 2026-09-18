@@ -140,6 +140,7 @@
 
     "limits": {
         "maxFileSizeMB": 2000,
+        "maxSendSizeMB": 30,
         "downloadTimeoutSec": 120,
         "apiTimeoutSec": 30,
         "queueSize": 3,
