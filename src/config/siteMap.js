@@ -111,29 +111,6 @@ const SITES = [
             /pin\.it\//i
         ]
     },
-    {
-        platform: "snapchat",
-        name: "Snapchat",
-        emoji: "👻",
-        command: "snapchat",
-        patterns: [
-            /snapchat\.com\//i
-        ]
-    },
-
-    // ═════════════════════════════════════════════
-    //  🎬  VIDEO PLATFORMS
-    // ═════════════════════════════════════════════
-    {
-        platform: "dailymotion",
-        name: "Dailymotion",
-        emoji: "📺",
-        command: "dailymotion",
-        patterns: [
-            /dailymotion\.com\//i,
-            /dai\.ly\//i
-        ]
-    },
 
     // ═════════════════════════════════════════════
     //  📦  FILE HOSTS & CLOUD STORAGE
