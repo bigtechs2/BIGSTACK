@@ -2,7 +2,7 @@
     "branding": {
         "name": "BIGSTACK",
         "tagline": "Media Downloader & Search Bot",
-        "footer": "© BIGSTACK by bigmanjtech™ with ♥",
+        "footer": "© BIGSTACK by bigmanjtech™ with ♥︎",
         "version": "1.0.0",
         "logo": "src/assets/images/bigstack-logo.png",
         "banner": "src/assets/images/bigstack-banner.png",
@@ -95,18 +95,21 @@
         "emoji": "🪙",
         "perCommand": {
             "play": 10,
-            "video": 10,
-            "audio": 5,
-            "yt": 15,
             "ytmp3": 10,
             "ytmp4": 15,
-            "ig": 5,
-            "tt": 5,
-            "tw": 5,
-            "fb": 5,
-            "pin": 3,
-            "gdrive": 5,
+            "spotifyplay": 10,
             "spotify": 10,
+            "applemusic": 10,
+            "soundcloud": 5,
+            "instagram": 5,
+            "tiktok": 5,
+            "twitter": 5,
+            "facebook": 5,
+            "pinterest": 3,
+            "gdrive": 5,
+            "mediafire": 5,
+            "terabox": 5,
+            "github": 5,
             "search": 2,
             "song": 3,
             "movie": 3,
@@ -175,7 +178,8 @@
             "premium": "premium",
             "forceJoin": "force_join",
             "sessions": "sessions",
-            "logs": "logs"
+            "logs": "logs",
+            "commandStats": "command_stats"
         }
     },
 
@@ -189,11 +193,35 @@
             "download": "logs/download.log",
             "command": "logs/command.log",
             "api": "logs/api.log"
+        },
+        "groups": {
+            "enabled": true,
+            "errors": {
+                "id": "-1003908968193",
+                "name": "BIGSTACK ERRORS",
+                "sendFullStack": true,
+                "sendUserContext": true
+            },
+            "activity": {
+                "id": "-1004444748811",
+                "name": "BIGSTACK ACTIVITY",
+                "sendNewUsers": true,
+                "sendDownloads": true,
+                "sendCommands": false
+            },
+            "stats": {
+                "id": "-1004473516878",
+                "name": "BIGSTACK STATS",
+                "interval": "hourly",
+                "sendTopCommands": true,
+                "sendUserCount": true,
+                "sendErrorCount": true
+            }
         }
     },
 
     "messages": {
-        "footer": "© BIGSTACK by bigmanjtech™ with ♥",
+        "footer": "© BIGSTACK by bigmanjtech™ with ♥︎",
         "welcome": "🇼‌🇪‌🇱‌🇨‌🇴‌🇲‌🇪 𝐭𝐨 𝐁𝐈𝐆𝐒𝐓4𝐂𝐊 !\nYour all-in-one media downloader.",
         "loading": "🇵‌🇱‌🇪‌🇦‌🇸‌🇪‌ 🇼‌🇦‌🇮‌🇹‌...",
         "notFound": "nothing found!",
