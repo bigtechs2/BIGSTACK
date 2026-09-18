@@ -1,6 +1,6 @@
 // ──────────────────────────────────────────────────
 //  BIGSTACK — Bot Entry Point
-//  © BIGSTACK by bigmanjtech™ with ♥
+//  © BIGSTACK by bigmanjtech™ with ♥︎
 // ──────────────────────────────────────────────────
 
 // ─── Load environment first ─────────────────────────
@@ -8,11 +8,13 @@ require("dotenv").config();
 
 // ─── Core modules ───────────────────────────────────
 const chalk = require("chalk");
+const mongoose = require("mongoose");
 
 // ─── Internal ───────────────────────────────────────
 const config = require("./config");
 const logger = require("./core/logger");
 const bot = require("./bot");
+const scheduler = require("./core/scheduler");
 const { connectDatabase } = require("./database/client");
 const { loadCommands } = require("./loader");
 const { loadMiddlewares } = require("./middlewares");
@@ -30,8 +32,8 @@ function printBanner() {
    ╚═════╝ ╚═╝ ╚═════╝ ╚══════╝   ╚═╝   ╚═╝  ╚═╝ ╚═════╝╚═╝  ╚═╝
     `)
     );
-    console.log(chalk.gray(`   ${config.branding.footer}\n`));
-    console.log(chalk.green(`   ✦ Starting BIGSTACK v${config.branding.version}...\n`));
+    console.log(chalk.gray(`   ${config.footer}\n`));
+    console.log(chalk.green(`   ✦ Starting BIGSTACK v${config.version}...\n`));
 }
 
 // ─── Validate environment variables ─────────────────
@@ -59,30 +61,49 @@ async function start() {
         await connectDatabase();
         logger.info("✅ Database connected");
 
-        // ─── 4. Load middlewares ────────────────────
+        // ─── 4. Attach bot to logger ────────────────
+        // Logger needs the bot instance to send to groups
+        logger.attachBot(bot);
+        logger.info("✅ Logger attached to bot (forwarding enabled)");
+
+        // ─── 5. Load middlewares ────────────────────
         loadMiddlewares(bot);
         logger.info("✅ Middlewares loaded");
 
-        // ─── 5. Load commands ───────────────────────
+        // ─── 6. Load commands ───────────────────────
         await loadCommands(bot);
 
-        // ─── 6. Set bot commands in Telegram ────────
+        // ─── 7. Set bot commands in Telegram ────────
         // (register via scripts/setCommands.js)
         // await bot.api.setMyCommands([...]);
 
-        // ─── 7. Start polling ───────────────────────
+        // ─── 8. Start the scheduler ─────────────────
+        scheduler.start();
+        logger.info("✅ Scheduler started");
+
+        // ─── 9. Start polling ───────────────────────
         bot.start({
             onStart: (botInfo) => {
                 logger.info("─────────────────────────────────────────");
                 logger.info(`🚀 BIGSTACK is online as @${botInfo.username}`);
                 logger.info(`👑 Owner: ${config.owner.username}`);
-                logger.info(`📦 Version: ${config.branding.version}`);
-                logger.info(`🌍 Environment: ${process.env.NODE_ENV || "development"}`);
+                logger.info(`📦 Version: ${config.version}`);
+                logger.info(`🌍 Environment: ${config.nodeEnv || "development"}`);
+                logger.info(`📊 Forwarding: ${config.logging?.groups?.enabled ? "✅ Enabled" : "❌ Disabled"}`);
                 logger.info("─────────────────────────────────────────");
+
+                // ─── Send "bot online" to STATS group ───
+                logger.stats({
+                    title: "BOT ONLINE",
+                    period: new Date().toLocaleString("en-GB", { hour12: false }),
+                    activeUsers: 0,
+                    downloads: 0,
+                    errors: 0
+                }).catch(() => {});
             }
         });
 
-        // ─── 8. Graceful shutdown ───────────────────
+        // ─── 10. Graceful shutdown ──────────────────
         setupShutdownHandlers();
 
     } catch (err) {
@@ -100,6 +121,15 @@ function setupShutdownHandlers() {
     const shutdown = async (signal) => {
         logger.warn(`\n⚠️  ${signal} received. Shutting down BIGSTACK...`);
 
+        // ─── 1. Stop scheduler ──────────────────────
+        try {
+            scheduler.stop();
+            logger.info("✅ Scheduler stopped");
+        } catch (e) {
+            logger.error("Error stopping scheduler:", e.message);
+        }
+
+        // ─── 2. Stop bot ────────────────────────────
         try {
             await bot.stop();
             logger.info("✅ Bot stopped");
@@ -107,13 +137,33 @@ function setupShutdownHandlers() {
             logger.error("Error stopping bot:", e.message);
         }
 
+        // ─── 3. Cleanup middlewares ─────────────────
         try {
-            const mongoose = require("mongoose");
+            const errorHandler = require("./middlewares/errorHandler");
+            const userLogger = require("./middlewares/userLogger");
+            if (errorHandler.cleanup) errorHandler.cleanup();
+            if (userLogger.cleanup) userLogger.cleanup();
+            logger.info("✅ Middlewares cleaned up");
+        } catch (e) {
+            // Silent — not critical
+        }
+
+        // ─── 4. Close database ──────────────────────
+        try {
             await mongoose.connection.close();
             logger.info("✅ Database disconnected");
         } catch (e) {
             logger.error("Error closing database:", e.message);
         }
+
+        // ─── 5. Notify stats group ──────────────────
+        await logger.stats({
+            title: "BOT OFFLINE",
+            period: new Date().toLocaleString("en-GB", { hour12: false }),
+            activeUsers: 0,
+            downloads: 0,
+            errors: 0
+        }).catch(() => {});
 
         logger.info("👋 Goodbye!");
         process.exit(0);
@@ -125,12 +175,13 @@ function setupShutdownHandlers() {
 
     // ─── Runtime errors ───
     process.on("unhandledRejection", (reason) => {
-        logger.error("💥 Unhandled Rejection:", reason);
+        logger.error(`💥 Unhandled Rejection: ${reason?.message || reason}`);
+        if (reason?.stack) logger.debug(reason.stack);
     });
 
     process.on("uncaughtException", (err) => {
-        logger.error("💥 Uncaught Exception:", err.message);
-        if (err.stack) logger.error(err.stack);
+        logger.error(`💥 Uncaught Exception: ${err.message}`);
+        if (err.stack) logger.debug(err.stack);
     });
 }
 
