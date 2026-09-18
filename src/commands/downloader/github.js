@@ -10,9 +10,10 @@ const axios = require("axios");
 const config = require("../../config");
 const logger = require("../../core/logger");
 const services = require("../../services/downloader");
+const { startProgress } = require("../../utils/progress");
 
-// ─── Max size to send via Telegram (20MB) ───────────
-const MAX_SEND_SIZE = 20 * 1024 * 1024;
+// ─── Max size to send via Telegram (from config) ────
+const MAX_SEND_SIZE = (config.limits?.maxSendSizeMB || 30) * 1024 * 1024;
 
 module.exports = {
     // ─── Metadata ───────────────────────────────────
@@ -65,11 +66,13 @@ module.exports = {
             });
         }
 
-        // ─── 4. Send loading ────────────────────────
-        const loading = await ctx.reply(
-            `⏳ *Processing...*\n\nFetching repo info from GitHub...`,
-            { parse_mode: "Markdown" }
-        );
+        // ─── 4. Start live progress ─────────────────
+        const progress = await startProgress(ctx, {
+            emoji: "🐙",
+            title: "Fetching repo info...",
+            command: "github",
+            input: `${url} ${format}`
+        });
 
         try {
             // ─── 5. Chat action ─────────────────────
@@ -79,54 +82,30 @@ module.exports = {
             logger.info(`[/github] user ${ctx.from.id} requesting ${url} (${format})`);
             const result = await services.github.download(url, format);
 
-            // ─── 7. Build info text ─────────────────
-            const infoLines = [
-                `🐙 *${result.fullName}*`,
-                ""
-            ];
-
-            if (result.description) {
-                infoLines.push(`📝 ${result.description}`);
-                infoLines.push("");
-            }
-
-            infoLines.push(`⭐ *Stars:* ${result.stars}`);
-            infoLines.push(`🍴 *Forks:* ${result.forks}`);
-            infoLines.push(`💻 *Language:* ${result.language}`);
-            infoLines.push(`🌿 *Branch:* ${result.branch}`);
-
-            if (result.sizeFormatted && result.sizeFormatted !== "Unknown") {
-                infoLines.push(`📏 *Size:* ${result.sizeFormatted}`);
-            }
-
-            infoLines.push(`📦 *Format:* ${format.toUpperCase()}`);
-            infoLines.push(`📡 *Provider:* ${result.provider}`);
-            infoLines.push("");
+            // ─── 7. Update progress with info ───────
+            progress.setProvider(result.provider);
+            progress.setTitle(`${result.fullName}`);
 
             // ─── 8. Size check ──────────────────────
             if (result.size > MAX_SEND_SIZE) {
-                infoLines.push(`⚠️ *Too large for Telegram* (limit: 20MB)`);
-                infoLines.push("");
-                infoLines.push(`🔗 [Download Link](${result.download})`);
+                const sizeLimitMB = Math.round(MAX_SEND_SIZE / (1024 * 1024));
 
-                await ctx.api.editMessageText(
-                    ctx.chat.id,
-                    loading.message_id,
-                    infoLines.join("\n"),
-                    { parse_mode: "Markdown", disable_web_page_preview: true }
-                );
+                await progress.finish({
+                    success: true,
+                    title: "Repo Ready (Too Large)",
+                    extra:
+                        (result.description ? `📝 ${truncate(result.description, 100)}\n\n` : "") +
+                        `⭐ ${result.stars} · 🍴 ${result.forks} · 💻 ${result.language}\n` +
+                        `🌿 ${result.branch} · 📦 ${format.toUpperCase()}\n` +
+                        `📏 *Size:* ${result.sizeFormatted}\n` +
+                        `⚠️ _Too large for Telegram_ (limit: ${sizeLimitMB}MB)\n\n` +
+                        `🔗 [Download Link](${result.download})`
+                });
                 return;
             }
 
-            // ─── 9. Update loading with download ────
-            infoLines.push(`📥 Downloading...`);
-
-            await ctx.api.editMessageText(
-                ctx.chat.id,
-                loading.message_id,
-                infoLines.join("\n"),
-                { parse_mode: "Markdown" }
-            );
+            // ─── 9. Update progress → downloading ───
+            progress.setTitle("Downloading repo...");
 
             // ─── 10. Download buffer ────────────────
             logger.info(`[/github] downloading ${result.filename}...`);
@@ -158,10 +137,15 @@ module.exports = {
                 }
             );
 
-            // ─── 13. Clean up ───────────────────────
-            await ctx.api
-                .deleteMessage(ctx.chat.id, loading.message_id)
-                .catch(() => {});
+            // ─── 13. Final success ──────────────────
+            await progress.finish({
+                success: true,
+                title: "Repo Sent!",
+                extra:
+                    `🐙 ${result.fullName}\n` +
+                    `⭐ ${result.stars} · 🍴 ${result.forks}\n` +
+                    `🌿 ${result.branch} · 📦 ${format.toUpperCase()}`
+            });
 
             logger.info(`[/github] ✅ sent ${result.filename} to ${ctx.from.id}`);
 
@@ -170,16 +154,22 @@ module.exports = {
 
             const errorText = getErrorMessage(error);
 
-            await ctx.api
-                .editMessageText(ctx.chat.id, loading.message_id, errorText, {
-                    parse_mode: "Markdown"
-                })
-                .catch(() => {
-                    ctx.reply(errorText, { parse_mode: "Markdown" });
-                });
+            // ─── Final error ────────────────────────
+            await progress.finish({
+                success: false,
+                title: "Download Failed",
+                extra: errorText
+            });
         }
     }
 };
+
+// ─── Helper: truncate ───────────────────────────────
+function truncate(str, max = 100) {
+    if (!str) return "";
+    const s = String(str);
+    return s.length > max ? s.slice(0, max - 3) + "..." : s;
+}
 
 // ─── Friendly errors ────────────────────────────────
 function getErrorMessage(error) {
@@ -197,6 +187,9 @@ function getErrorMessage(error) {
     }
     if (error.code === "ECONNABORTED") {
         return "⌛ *Download timeout.*\n\nThe repo is too large or connection is slow.";
+    }
+    if (error.message?.includes("request entity too large")) {
+        return "❌ *Repo too large for Telegram.*\n\nTry again later.";
     }
     return "❌ *Something went wrong.*\n\nPlease try again later.";
 }
