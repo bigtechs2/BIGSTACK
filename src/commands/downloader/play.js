@@ -1,5 +1,6 @@
 // ──────────────────────────────────────────────────
 //  BIGSTACK — /play Command
+//  Search and download audio from YouTube
 //  © BIGSTACK by bigmanjtech™ with ♥︎
 // ──────────────────────────────────────────────────
 
@@ -9,6 +10,7 @@ const axios = require("axios");
 const config = require("../../config");
 const logger = require("../../core/logger");
 const services = require("../../services/downloader");
+const { startProgress } = require("../../utils/progress");
 
 module.exports = {
     // ─── Metadata ───────────────────────────────────
@@ -46,37 +48,33 @@ module.exports = {
             );
         }
 
-        // ─── 2. Send loading message ────────────────
-        const loading = await ctx.reply(
-            `🔍 *Searching...*\n\nLooking for *${query}*\nPlease wait...`,
-            { parse_mode: "Markdown" }
-        );
+        // ─── 2. Start live progress ─────────────────
+        const progress = await startProgress(ctx, {
+            emoji: "🎵",
+            title: "Searching YouTube...",
+            command: "play",
+            input: query
+        });
 
         try {
-            // ─── 3. Update chat action ──────────────
+            // ─── 3. Chat action ─────────────────────
             await ctx.replyWithChatAction("upload_audio");
 
-            // ─── 4. Call the service ────────────────
+            // ─── 4. Call service ────────────────────
             logger.info(`[/play] user ${ctx.from.id} searching "${query}"`);
             const result = await services.play.search(query);
 
-            // ─── 5. Edit loading message ────────────
-            await ctx.api.editMessageText(
-                ctx.chat.id,
-                loading.message_id,
-                `🎵 *${result.title}*\n\n` +
-                    `👤 *Artist:* ${result.channel}\n` +
-                    `⏱ *Duration:* ${formatDuration(result.duration)}\n` +
-                    `📡 *Provider:* ${result.provider}\n\n` +
-                    `📥 Downloading audio...`,
-                { parse_mode: "Markdown" }
-            );
+            // ─── 5. Update progress with info ───────
+            progress.setProvider(result.provider);
+            progress.setTitle(`Downloading audio...`);
 
             // ─── 6. Download the audio buffer ───────
             logger.info(`[/play] downloading from ${result.provider}...`);
             const audioRes = await axios.get(result.download, {
                 responseType: "arraybuffer",
                 timeout: 60000,
+                maxContentLength: Infinity,
+                maxBodyLength: Infinity,
                 headers: {
                     "User-Agent":
                         "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
@@ -90,7 +88,7 @@ module.exports = {
                 `👤 *Artist:* ${result.channel}\n` +
                 `⏱ *Duration:* ${formatDuration(result.duration)}\n` +
                 `📡 *Provider:* ${result.provider}\n\n` +
-                `🔗 [Watch on YouTube](${result.videoUrl || "#"})`;
+                (result.videoUrl ? `🔗 [Watch on YouTube](${result.videoUrl})` : "");
 
             // ─── 8. Send the audio ──────────────────
             await ctx.replyWithAudio(
@@ -98,32 +96,34 @@ module.exports = {
                 {
                     title: result.title,
                     performer: result.channel,
-                    duration: result.duration,
+                    duration: result.duration || 0,
                     caption,
                     parse_mode: "Markdown"
                 }
             );
 
-            // ─── 9. Delete loading message ──────────
-            await ctx.api
-                .deleteMessage(ctx.chat.id, loading.message_id)
-                .catch(() => {});
+            // ─── 9. Final success ───────────────────
+            await progress.finish({
+                success: true,
+                title: "Song Sent!",
+                extra:
+                    `🎵 ${truncate(result.title, 50)}\n` +
+                    `👤 ${result.channel} · ⏱ ${formatDuration(result.duration)}`
+            });
 
             logger.info(`[/play] ✅ sent "${result.title}" to ${ctx.from.id}`);
 
         } catch (error) {
-            // ─── Error handling ─────────────────────
             logger.error(`[/play] failed for "${query}": ${error.message}`);
 
             const errorText = getErrorMessage(error);
 
-            await ctx.api
-                .editMessageText(ctx.chat.id, loading.message_id, errorText, {
-                    parse_mode: "Markdown"
-                })
-                .catch(() => {
-                    ctx.reply(errorText, { parse_mode: "Markdown" });
-                });
+            // ─── Final error ────────────────────────
+            await progress.finish({
+                success: false,
+                title: "Search Failed",
+                extra: errorText
+            });
         }
     }
 };
@@ -142,6 +142,13 @@ function sanitize(str) {
         .replace(/[^\w\s-]/g, "")
         .replace(/\s+/g, "_")
         .slice(0, 60);
+}
+
+// ─── Helper: truncate ───────────────────────────────
+function truncate(str, max = 50) {
+    if (!str) return "";
+    const s = String(str);
+    return s.length > max ? s.slice(0, max - 3) + "..." : s;
 }
 
 // ─── Helper: friendly error messages ────────────────
