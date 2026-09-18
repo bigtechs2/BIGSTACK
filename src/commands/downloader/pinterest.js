@@ -10,6 +10,7 @@ const axios = require("axios");
 const config = require("../../config");
 const logger = require("../../core/logger");
 const services = require("../../services/downloader");
+const { startProgress } = require("../../utils/progress");
 
 module.exports = {
     // ─── Metadata ───────────────────────────────────
@@ -53,11 +54,13 @@ module.exports = {
             });
         }
 
-        // ─── 3. Send loading ────────────────────────
-        const loading = await ctx.reply(
-            `⏳ *Processing...*\n\nFetching from Pinterest...`,
-            { parse_mode: "Markdown" }
-        );
+        // ─── 3. Start live progress ─────────────────
+        const progress = await startProgress(ctx, {
+            emoji: "📌",
+            title: "Fetching from Pinterest...",
+            command: "pinterest",
+            input: url
+        });
 
         try {
             // ─── 4. Chat action ─────────────────────
@@ -67,15 +70,9 @@ module.exports = {
             logger.info(`[/pinterest] user ${ctx.from.id} requesting ${url}`);
             const result = await services.pinterest.download(url);
 
-            // ─── 6. Update loading ──────────────────
-            await ctx.api.editMessageText(
-                ctx.chat.id,
-                loading.message_id,
-                `📌 *${result.title}*\n\n` +
-                    `📡 *Provider:* ${result.provider}\n` +
-                    `📥 Downloading ${result.type}...`,
-                { parse_mode: "Markdown" }
-            );
+            // ─── 6. Update progress with info ───────
+            progress.setProvider(result.provider);
+            progress.setTitle(`Downloading ${result.type}...`);
 
             // ─── 7. Download buffer ─────────────────
             logger.info(`[/pinterest] downloading ${result.type} from ${result.provider}...`);
@@ -93,7 +90,7 @@ module.exports = {
 
             // ─── 8. Build caption ───────────────────
             const caption =
-                `📌 *${result.title}*\n\n` +
+                `📌 *${truncate(result.title, 100)}*\n\n` +
                 (result.channel && result.channel !== "Unknown"
                     ? `👤 *Author:* ${result.channel}\n`
                     : "") +
@@ -119,10 +116,14 @@ module.exports = {
                 );
             }
 
-            // ─── 10. Clean up ───────────────────────
-            await ctx.api
-                .deleteMessage(ctx.chat.id, loading.message_id)
-                .catch(() => {});
+            // ─── 10. Final success ──────────────────
+            await progress.finish({
+                success: true,
+                title: "Sent!",
+                extra:
+                    `📌 Pinterest ${capitalize(result.type)}\n` +
+                    `🎯 Pin: \`${result.pinId}\``
+            });
 
             logger.info(`[/pinterest] ✅ sent ${result.type} to ${ctx.from.id}`);
 
@@ -131,18 +132,27 @@ module.exports = {
 
             const errorText = getErrorMessage(error);
 
-            await ctx.api
-                .editMessageText(ctx.chat.id, loading.message_id, errorText, {
-                    parse_mode: "Markdown"
-                })
-                .catch(() => {
-                    ctx.reply(errorText, { parse_mode: "Markdown" });
-                });
+            // ─── Final error ────────────────────────
+            await progress.finish({
+                success: false,
+                title: "Download Failed",
+                extra: errorText
+            });
         }
     }
 };
 
 // ─── Helpers ────────────────────────────────────────
+function capitalize(str) {
+    return str ? str.charAt(0).toUpperCase() + str.slice(1) : "";
+}
+
+function truncate(str, max = 100) {
+    if (!str) return "";
+    const s = String(str);
+    return s.length > max ? s.slice(0, max - 3) + "..." : s;
+}
+
 function getErrorMessage(error) {
     if (error.message?.includes("All pinterest providers failed")) {
         return "❌ *Download failed.*\n\nThis pin might be private or unavailable.";
