@@ -6,6 +6,9 @@
 // ─── All supported platforms ────────────────────────
 // Order matters: first match wins
 const SITES = [
+    // ═════════════════════════════════════════════
+    //  🎵  MUSIC
+    // ═════════════════════════════════════════════
     {
         platform: "youtube",
         name: "YouTube",
@@ -19,6 +22,40 @@ const SITES = [
             /music\.youtube\.com/i
         ]
     },
+    {
+        platform: "spotify",
+        name: "Spotify",
+        emoji: "🎧",
+        command: "spotify",
+        patterns: [
+            /open\.spotify\.com\/(track|album|playlist|artist)\//i,
+            /spoti\.fi\//i
+        ]
+    },
+    {
+        platform: "applemusic",
+        name: "Apple Music",
+        emoji: "🍎",
+        command: "applemusic",
+        patterns: [
+            /music\.apple\.com\//i,
+            /itunes\.apple\.com\//i
+        ]
+    },
+    {
+        platform: "soundcloud",
+        name: "SoundCloud",
+        emoji: "☁️",
+        command: "soundcloud",
+        patterns: [
+            /soundcloud\.com\//i,
+            /snd\.sc\//i
+        ]
+    },
+
+    // ═════════════════════════════════════════════
+    //  📱  SOCIAL MEDIA
+    // ═════════════════════════════════════════════
     {
         platform: "instagram",
         name: "Instagram",
@@ -75,6 +112,33 @@ const SITES = [
         ]
     },
     {
+        platform: "snapchat",
+        name: "Snapchat",
+        emoji: "👻",
+        command: "snapchat",
+        patterns: [
+            /snapchat\.com\//i
+        ]
+    },
+
+    // ═════════════════════════════════════════════
+    //  🎬  VIDEO PLATFORMS
+    // ═════════════════════════════════════════════
+    {
+        platform: "dailymotion",
+        name: "Dailymotion",
+        emoji: "📺",
+        command: "dailymotion",
+        patterns: [
+            /dailymotion\.com\//i,
+            /dai\.ly\//i
+        ]
+    },
+
+    // ═════════════════════════════════════════════
+    //  📦  FILE HOSTS & CLOUD STORAGE
+    // ═════════════════════════════════════════════
+    {
         platform: "gdrive",
         name: "Google Drive",
         emoji: "📂",
@@ -83,26 +147,6 @@ const SITES = [
             /drive\.google\.com\/file\/d\//i,
             /drive\.google\.com\/open\?id=/i,
             /drive\.google\.com\/uc\?id=/i
-        ]
-    },
-    {
-        platform: "spotify",
-        name: "Spotify",
-        emoji: "🎧",
-        command: "spotify",
-        patterns: [
-            /open\.spotify\.com\/(track|album|playlist|artist)\//i,
-            /spoti\.fi\//i
-        ]
-    },
-    {
-        platform: "soundcloud",
-        name: "SoundCloud",
-        emoji: "☁️",
-        command: "soundcloud",
-        patterns: [
-            /soundcloud\.com\//i,
-            /snd\.sc\//i
         ]
     },
     {
@@ -115,50 +159,30 @@ const SITES = [
         ]
     },
     {
-        platform: "reddit",
-        name: "Reddit",
-        emoji: "👽",
-        command: "reddit",
+        platform: "terabox",
+        name: "Terabox",
+        emoji: "📦",
+        command: "terabox",
         patterns: [
-            /reddit\.com\//i,
-            /redd\.it\//i
+            /terabox\.com\/s\//i,
+            /1024terabox\.com\/s\//i,
+            /teraboxapp\.com\/s\//i,
+            /4funbox\.com\/s\//i,
+            /mirrobox\.com\/s\//i,
+            /nephobox\.com\/s\//i,
+            /momerybox\.com\/s\//i,
+            /tibibox\.com\/s\//i,
+            /teraboxlink\.com\/s\//i,
+            /freeterabox\.com\/s\//i
         ]
     },
     {
-        platform: "threads",
-        name: "Threads",
-        emoji: "🧵",
-        command: "threads",
+        platform: "github",
+        name: "GitHub",
+        emoji: "🐙",
+        command: "github",
         patterns: [
-            /threads\.net\//i
-        ]
-    },
-    {
-        platform: "snapchat",
-        name: "Snapchat",
-        emoji: "👻",
-        command: "snapchat",
-        patterns: [
-            /snapchat\.com\//i
-        ]
-    },
-    {
-        platform: "vimeo",
-        name: "Vimeo",
-        emoji: "🎬",
-        command: "vimeo",
-        patterns: [
-            /vimeo\.com\//i
-        ]
-    },
-    {
-        platform: "dailymotion",
-        name: "Dailymotion",
-        emoji: "📺",
-        command: "dailymotion",
-        patterns: [
-            /dailymotion\.com\//i,
-            /dai\.ly\//i
+            /github\.com\/[^/\s]+\/[^/\s]+/i
         ]
     }
 ];
@@ -210,6 +234,11 @@ function listPlatforms() {
     }));
 }
 
+// ─── Count total platforms ──────────────────────────
+function count() {
+    return SITES.length;
+}
+
 // ─── Export ─────────────────────────────────────────
 module.exports = {
     SITES,
@@ -217,5 +246,6 @@ module.exports = {
     isSupported,
     getPlatform,
     getCommand,
-    listPlatforms
+    listPlatforms,
+    count
 };
