@@ -10,14 +10,14 @@ const axios = require("axios");
 const config = require("../../config");
 const logger = require("../../core/logger");
 const services = require("../../services/downloader");
+const { startProgress } = require("../../utils/progress");
 
 module.exports = {
-    // ─── Metadata ───────────────────────────────────
     name: "ytmp4",
     aliases: ["mp4", "ytvideo", "ytv"],
     category: "downloader",
     description: "Download YouTube video as MP4",
-    emoji: "🎬",
+    emoji: "▣",
     usage: "<youtube url>",
 
     permissions: {
@@ -29,59 +29,56 @@ module.exports = {
         private: true
     },
 
-    // ─── Command Code ───────────────────────────────
     code: async (ctx) => {
         const url = ctx.args[0]?.trim();
 
-        // ─── 1. Validate input ──────────────────────
+        // ─── 1. Validate input ─────────────────────
         if (!url) {
             return ctx.reply(
-                `🎬 *YTMP4*\n\n` +
-                    `Download any YouTube video as MP4.\n\n` +
-                    `*Usage:*\n` +
-                    `${config.prefix}ytmp4 <youtube url>\n\n` +
-                    `*Example:*\n` +
-                    `${config.prefix}ytmp4 https://youtube.com/watch?v=60rLYaz9Q1w`,
+                `▣ *YTMP4*\n\n` +
+                `◈ Download any YouTube video as MP4\n\n` +
+                `▸ Usage\n` +
+                `   ➤ ${config.prefix}ytmp4 <youtube url>\n\n` +
+                `▸ Example\n` +
+                `   ➤ ${config.prefix}ytmp4 https://youtube.com/watch?v=60rLYaz9Q1w`,
                 { parse_mode: "Markdown" }
             );
         }
 
-        // ─── 2. Check if valid YouTube URL ──────────
+        // ─── 2. Validate YouTube URL ───────────────
         if (!config.siteMap.isSupported(url) || config.siteMap.getPlatform(url) !== "youtube") {
-            return ctx.reply("❌ Please provide a valid *YouTube* link.", {
-                parse_mode: "Markdown"
-            });
+            return ctx.reply(
+                `✗  Invalid URL\n\n` +
+                `   Please provide a valid YouTube link.`,
+                { parse_mode: "Markdown" }
+            );
         }
 
-        // ─── 3. Send loading message ────────────────
-        const loading = await ctx.reply(
-            `⏳ *Processing...*\n\nFetching MP4 from YouTube...`,
-            { parse_mode: "Markdown" }
-        );
+        // ─── 3. Start live progress ────────────────
+        const progress = await startProgress(ctx, {
+            emoji: "▣",
+            title: "Fetching MP4 from YouTube...",
+            command: "ytmp4",
+            input: url
+        });
 
         try {
-            // ─── 4. Show chat action ────────────────
             await ctx.replyWithChatAction("upload_video");
 
-            // ─── 5. Call the service ────────────────
             logger.info(`[/ytmp4] user ${ctx.from.id} requesting ${url}`);
             const result = await services.ytmp4.download(url);
 
-            // ─── 6. Update loading message ──────────
-            await ctx.api.editMessageText(
-                ctx.chat.id,
-                loading.message_id,
-                `🎬 *${result.title}*\n\n` +
-                    `📡 *Provider:* ${result.provider}\n` +
-                    `📥 Downloading video...`,
-                { parse_mode: "Markdown" }
-            );
+            // Expose provider for ACTIVITY group
+            ctx.progressProvider = result.provider;
 
-            // ─── 7. Download the video buffer ───────
+            progress.setProvider(result.provider);
+            progress.setTitle("Downloading video...");
+
+            // ─── Download buffer ────────────────────
             logger.info(`[/ytmp4] downloading from ${result.provider}...`);
             const videoRes = await axios.get(result.download, {
                 responseType: "arraybuffer",
-                timeout: 120000,
+                timeout: 180000,
                 maxContentLength: Infinity,
                 maxBodyLength: Infinity,
                 headers: {
@@ -91,47 +88,74 @@ module.exports = {
             });
             const videoBuffer = Buffer.from(videoRes.data);
 
-            // ─── 8. Build caption ───────────────────
-            const caption =
-                `🎬 *${result.title}*\n\n` +
-                (result.channel ? `👤 *Author:* ${result.channel}\n` : "") +
-                (result.duration ? `⏱ *Duration:* ${formatDuration(result.duration)}\n` : "") +
-                `📡 *Provider:* ${result.provider}`;
+            // ─── Build card caption ─────────────────
+            const caption = buildCardCaption(result);
 
-            // ─── 9. Send the video ──────────────────
+            // ─── Send video ─────────────────────────
             await ctx.replyWithVideo(
                 new InputFile(videoBuffer, `${sanitize(result.title)}.mp4`),
                 {
                     caption,
                     parse_mode: "Markdown",
-                    supports_streaming: true
+                    supports_streaming: true,
+                    thumbnail: result.thumbnail || undefined
                 }
             );
 
-            // ─── 10. Clean up loading message ───────
-            await ctx.api
-                .deleteMessage(ctx.chat.id, loading.message_id)
-                .catch(() => {});
+            // ─── Final success ──────────────────────
+            await progress.finish({
+                success: true,
+                title: "Video Sent",
+                extra:
+                    `✓  YouTube MP4 delivered\n\n` +
+                    `   ▣ Title     ➤ ${truncate(result.title, 50)}\n` +
+                    `   ◉ Author    ➤ ${result.channel || "unknown"}\n` +
+                    (result.duration ? `   ◐ Duration  ➤ ${formatDuration(result.duration)}\n` : "") +
+                    `   ⊛ Provider  ➤ ${result.provider}`
+            });
 
-            logger.info(`[/ytmp4] ✅ sent "${result.title}" to ${ctx.from.id}`);
+            logger.info(`[/ytmp4] ✓ sent "${result.title}" to ${ctx.from.id}`);
 
         } catch (error) {
             logger.error(`[/ytmp4] failed: ${error.message}`);
 
-            const errorText = getErrorMessage(error);
-
-            await ctx.api
-                .editMessageText(ctx.chat.id, loading.message_id, errorText, {
-                    parse_mode: "Markdown"
-                })
-                .catch(() => {
-                    ctx.reply(errorText, { parse_mode: "Markdown" });
-                });
+            await progress.finish({
+                success: false,
+                title: "Download Failed",
+                extra: getErrorMessage(error)
+            });
         }
     }
 };
 
-// ─── Helper: format duration ────────────────────────
+// ═══════════════════════════════════════════════
+//  Card builder
+// ═══════════════════════════════════════════════
+function buildCardCaption(result) {
+    const title = result.title && result.title.length > 100
+        ? result.title.slice(0, 100) + "..."
+        : result.title || "YouTube Video";
+
+    const lines = [
+        `▣  *YTMP4 VIDEO*`,
+        ``,
+        `◈ ${title}`,
+        ``
+    ];
+
+    if (result.channel) lines.push(`◉ Author    ➤  ${result.channel}`);
+    if (result.duration) lines.push(`◐ Duration  ➤  ${formatDuration(result.duration)}`);
+    lines.push(`⊛ Provider  ➤  ${result.provider}`);
+
+    lines.push(``);
+    lines.push(`▸ ✓ successfully downloaded`);
+
+    return lines.join("\n");
+}
+
+// ═══════════════════════════════════════════════
+//  Helpers
+// ═══════════════════════════════════════════════
 function formatDuration(seconds) {
     if (!seconds || seconds <= 0) return "N/A";
     const m = Math.floor(seconds / 60);
@@ -139,7 +163,6 @@ function formatDuration(seconds) {
     return `${m}:${s.toString().padStart(2, "0")}`;
 }
 
-// ─── Helper: sanitize filename ──────────────────────
 function sanitize(str) {
     return (str || "video")
         .replace(/[^\w\s-]/g, "")
@@ -147,19 +170,39 @@ function sanitize(str) {
         .slice(0, 60);
 }
 
-// ─── Helper: friendly error messages ────────────────
+function truncate(str, max = 50) {
+    if (!str) return "";
+    const s = String(str);
+    return s.length > max ? s.slice(0, max - 3) + "..." : str;
+}
+
 function getErrorMessage(error) {
     if (error.message?.includes("All ytmp4 providers failed")) {
-        return "❌ *Download failed.*\n\nThis video might be restricted or unavailable.";
+        return (
+            `✗  Download failed\n\n` +
+            `   This video might be restricted or unavailable.`
+        );
     }
     if (error.message?.includes("Invalid YouTube URL")) {
-        return "❌ *Invalid YouTube URL.*";
+        return `✗  Invalid YouTube URL`;
     }
     if (error.response?.status === 429) {
-        return "⏳ *Rate limited.*\n\nPlease wait a minute.";
+        return (
+            `◐  Rate limited\n\n` +
+            `   Please wait a minute before trying again.`
+        );
     }
     if (error.code === "ECONNABORTED") {
-        return "⌛ *Download timeout.*\n\nThe video is too large or the connection is slow.";
+        return (
+            `◕  Download timeout\n\n` +
+            `   The video is too large or the connection is slow.`
+        );
     }
-    return "❌ *Something went wrong.*\n\nPlease try again later.";
+    if (error.message?.includes("request entity too large")) {
+        return `✗  Video too large for Telegram`;
+    }
+    return (
+        `✗  Something went wrong\n\n` +
+        `   Please try again later.`
+    );
 }
