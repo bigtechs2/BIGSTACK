@@ -4,12 +4,16 @@
 // ──────────────────────────────────────────────────
 
 const { Bot } = require("grammy");
+const { hydrateReply, parseMode } = require("@grammyjs/parse-mode");
+const { autoRetry } = require("@grammyjs/auto-retry");
+const { stream } = require("@grammyjs/stream");
+
 const config = require("./config");
 const logger = require("./core/logger");
 const errorForwarder = require("./core/errorForwarder");
 
 // ══════════════════════════════════════════════════
-//  🤖 CREATE BOT INSTANCE
+//  CREATE BOT INSTANCE
 // ══════════════════════════════════════════════════
 
 const bot = new Bot(process.env.BOT_TOKEN, {
@@ -18,18 +22,35 @@ const bot = new Bot(process.env.BOT_TOKEN, {
     }
 });
 
-// ─── Attach config to bot for easy access ───────────
+// ─── Attach config to bot ───────────────────────────
 bot.config = config;
 
 // ══════════════════════════════════════════════════
-//  🔗 ATTACH BOT TO LOGGER
+//  RICH MESSAGE PLUGINS
+// ══════════════════════════════════════════════════
+
+// ─── 1. Auto-retry (needed by stream) ───────────────
+// Handles Telegram rate limits automatically
+bot.api.config.use(autoRetry({
+    maxRetryAttempts: 3,
+    maxDelaySeconds: 5
+}));
+
+// ─── 2. Parse mode — enables ctx.replyWithHTML, etc. ─
+bot.use(hydrateReply);
+
+// ─── 3. Stream — live typing updates ────────────────
+bot.use(stream());
+
+// ══════════════════════════════════════════════════
+//  ATTACH BOT TO LOGGER
 //  Now logger can send messages to your 3 groups
 // ══════════════════════════════════════════════════
 
 logger.attachBot(bot);
 
 // ══════════════════════════════════════════════════
-//  🚨 GLOBAL ERROR HANDLER
+//  GLOBAL ERROR HANDLER
 //  Catches errors that escape middleware + command
 //  Forwards full error to ERRORS group
 // ══════════════════════════════════════════════════
@@ -45,16 +66,17 @@ bot.catch(async (err) => {
     try {
         await errorForwarder.forwardGlobalError(error, ctx);
     } catch (e) {
-        // If forwarding fails, log locally (don't recurse)
         logger.warn(`[bot.catch] forwarding failed: ${e.message}`);
     }
 
-    // ─── 3. Try to reply to user ────────────────────
+    // ─── 3. Reply to user (avoid double-reply) ──────
     try {
         if (ctx && typeof ctx.reply === "function") {
-            // Avoid double-reply if errorHandler already replied
             if (!ctx.__errorReplied) {
-                await ctx.reply(config.messages?.error || "❌ Something went wrong. Please try again later.");
+                await ctx.reply(
+                    config.messages?.error ||
+                        "✗  Something went wrong. Please try again later."
+                );
                 ctx.__errorReplied = true;
             }
         }
@@ -64,7 +86,7 @@ bot.catch(async (err) => {
 });
 
 // ══════════════════════════════════════════════════
-//  🧹 EXPORT
+//  EXPORT
 // ══════════════════════════════════════════════════
 
 module.exports = bot;
