@@ -10,11 +10,12 @@ const axios = require("axios");
 const config = require("../../config");
 const logger = require("../../core/logger");
 const services = require("../../services/downloader");
+const { startProgress } = require("../../utils/progress");
 
 module.exports = {
     // ─── Metadata ───────────────────────────────────
     name: "spotifyplay",
-    aliases: ["sp", "spsearch", "spotifydl"],
+    aliases: ["spplay", "spsearch", "spotifysearch"],
     category: "downloader",
     description: "Search and download Spotify tracks",
     emoji: "🎧",
@@ -47,11 +48,13 @@ module.exports = {
             );
         }
 
-        // ─── 2. Send loading ────────────────────────
-        const loading = await ctx.reply(
-            `🔍 *Searching Spotify...*\n\nLooking for *${query}*\nPlease wait...`,
-            { parse_mode: "Markdown" }
-        );
+        // ─── 2. Start live progress ─────────────────
+        const progress = await startProgress(ctx, {
+            emoji: "🎧",
+            title: "Searching Spotify...",
+            command: "spotifyplay",
+            input: query
+        });
 
         try {
             // ─── 3. Chat action ─────────────────────
@@ -61,23 +64,17 @@ module.exports = {
             logger.info(`[/spotifyplay] user ${ctx.from.id} searching "${query}"`);
             const result = await services.spotifyplay.search(query);
 
-            // ─── 5. Update loading message ──────────
-            await ctx.api.editMessageText(
-                ctx.chat.id,
-                loading.message_id,
-                `🎧 *${result.title}*\n\n` +
-                    `👤 *Artist:* ${result.channel}\n` +
-                    `⏱ *Duration:* ${formatDuration(result.duration)}\n` +
-                    `📡 *Provider:* ${result.provider}\n\n` +
-                    `📥 Downloading audio...`,
-                { parse_mode: "Markdown" }
-            );
+            // ─── 5. Update progress with info ───────
+            progress.setProvider(result.provider);
+            progress.setTitle("Downloading audio...");
 
             // ─── 6. Download the buffer ─────────────
             logger.info(`[/spotifyplay] downloading from ${result.provider}...`);
             const audioRes = await axios.get(result.download, {
                 responseType: "arraybuffer",
                 timeout: 60000,
+                maxContentLength: Infinity,
+                maxBodyLength: Infinity,
                 headers: {
                     "User-Agent":
                         "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
@@ -89,7 +86,7 @@ module.exports = {
             const caption =
                 `🎧 *${result.title}*\n\n` +
                 `👤 *Artist:* ${result.channel}\n` +
-                `⏱ *Duration:* ${formatDuration(result.duration)}\n` +
+                (result.duration ? `⏱ *Duration:* ${formatDuration(result.duration)}\n` : "") +
                 `📡 *Provider:* ${result.provider}`;
 
             // ─── 8. Send audio ──────────────────────
@@ -98,16 +95,21 @@ module.exports = {
                 {
                     title: result.title,
                     performer: result.channel,
-                    duration: result.duration,
+                    duration: result.duration || 0,
                     caption,
                     parse_mode: "Markdown"
                 }
             );
 
-            // ─── 9. Clean up ────────────────────────
-            await ctx.api
-                .deleteMessage(ctx.chat.id, loading.message_id)
-                .catch(() => {});
+            // ─── 9. Final success ───────────────────
+            await progress.finish({
+                success: true,
+                title: "Song Sent!",
+                extra:
+                    `🎧 ${truncate(result.title, 50)}\n` +
+                    `👤 ${result.channel}` +
+                    (result.duration ? ` · ⏱ ${formatDuration(result.duration)}` : "")
+            });
 
             logger.info(`[/spotifyplay] ✅ sent "${result.title}" to ${ctx.from.id}`);
 
@@ -116,13 +118,12 @@ module.exports = {
 
             const errorText = getErrorMessage(error);
 
-            await ctx.api
-                .editMessageText(ctx.chat.id, loading.message_id, errorText, {
-                    parse_mode: "Markdown"
-                })
-                .catch(() => {
-                    ctx.reply(errorText, { parse_mode: "Markdown" });
-                });
+            // ─── Final error ────────────────────────
+            await progress.finish({
+                success: false,
+                title: "Search Failed",
+                extra: errorText
+            });
         }
     }
 };
@@ -141,6 +142,13 @@ function sanitize(str) {
         .replace(/[^\w\s-]/g, "")
         .replace(/\s+/g, "_")
         .slice(0, 60);
+}
+
+// ─── Helper: truncate ───────────────────────────────
+function truncate(str, max = 50) {
+    if (!str) return "";
+    const s = String(str);
+    return s.length > max ? s.slice(0, max - 3) + "..." : s;
 }
 
 // ─── Helper: friendly errors ────────────────────────
