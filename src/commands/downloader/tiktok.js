@@ -10,14 +10,16 @@ const axios = require("axios");
 const config = require("../../config");
 const logger = require("../../core/logger");
 const services = require("../../services/downloader");
+const { startProgress } = require("../../utils/progress");
+
+const MAX_SEND_SIZE = (config.limits?.maxSendSizeMB || 30) * 1024 * 1024;
 
 module.exports = {
-    // ─── Metadata ───────────────────────────────────
     name: "tiktok",
     aliases: ["tt", "ttdl"],
     category: "downloader",
     description: "Download TikTok videos without watermark",
-    emoji: "🎵",
+    emoji: "♬",
     usage: "<tiktok url>",
 
     permissions: {
@@ -29,58 +31,48 @@ module.exports = {
         private: true
     },
 
-    // ─── Command Code ───────────────────────────────
     code: async (ctx) => {
         const url = ctx.args[0]?.trim();
 
-        // ─── 1. Validate input ──────────────────────
+        // ─── 1. Validate input ─────────────────────
         if (!url) {
             return ctx.reply(
-                `🎵 *TIKTOK*\n\n` +
-                    `Download TikTok videos without watermark.\n\n` +
-                    `*Usage:*\n` +
-                    `${config.prefix}tiktok <tiktok url>\n\n` +
-                    `*Example:*\n` +
-                    `${config.prefix}tiktok https://vt.tiktok.com/ZSuCudN2c/`,
+                `♬ *TIKTOK DOWNLOADER*\n\n` +
+                `◈ Download TikTok videos without watermark\n\n` +
+                `▸ Usage\n` +
+                `   ➤ ${config.prefix}tiktok <tiktok url>\n\n` +
+                `▸ Example\n` +
+                `   ➤ ${config.prefix}tiktok https://vt.tiktok.com/ZSuCudN2c/`,
                 { parse_mode: "Markdown" }
             );
         }
 
-        // ─── 2. Validate TikTok URL ─────────────────
+        // ─── 2. Validate URL ───────────────────────
         if (!config.siteMap.isSupported(url) || config.siteMap.getPlatform(url) !== "tiktok") {
-            return ctx.reply("❌ Please provide a valid *TikTok* URL.", {
-                parse_mode: "Markdown"
-            });
+            return ctx.reply(
+                `✗  Invalid URL\n\n` +
+                `   Please provide a valid TikTok link.`,
+                { parse_mode: "Markdown" }
+            );
         }
 
-        // ─── 3. Send loading ────────────────────────
-        const loading = await ctx.reply(
-            `⏳ *Processing...*\n\nFetching from TikTok...`,
-            { parse_mode: "Markdown" }
-        );
+        // ─── 3. Start live progress ────────────────
+        const progress = await startProgress(ctx, {
+            emoji: "♬",
+            title: "Fetching from TikTok...",
+            command: "tiktok",
+            input: url
+        });
 
         try {
-            // ─── 4. Chat action ─────────────────────
             await ctx.replyWithChatAction("upload_video");
 
-            // ─── 5. Call service ────────────────────
             logger.info(`[/tiktok] user ${ctx.from.id} requesting ${url}`);
             const result = await services.tiktok.download(url);
 
-            // ─── 6. Update loading ──────────────────
-            await ctx.api.editMessageText(
-                ctx.chat.id,
-                loading.message_id,
-                `🎵 *TikTok Video*\n\n` +
-                    `👤 *Author:* ${result.author}\n` +
-                    `🎞 *Quality:* ${result.quality.toUpperCase()}` +
-                    (result.watermark ? " (with watermark)" : " (no watermark)") +
-                    `\n📡 *Provider:* ${result.provider}\n\n` +
-                    `📥 Downloading video...`,
-                { parse_mode: "Markdown" }
-            );
+            progress.setProvider(result.provider);
+            progress.setTitle(`Downloading ${result.quality.toUpperCase()} video...`);
 
-            // ─── 7. Download buffer ─────────────────
             logger.info(`[/tiktok] downloading from ${result.provider}...`);
             const videoRes = await axios.get(result.download, {
                 responseType: "arraybuffer",
@@ -95,20 +87,10 @@ module.exports = {
             });
             const videoBuffer = Buffer.from(videoRes.data);
 
-            // ─── 8. Build caption ───────────────────
-            const shortTitle =
-                result.title.length > 150
-                    ? result.title.slice(0, 150) + "..."
-                    : result.title;
+            // ─── Build card caption ────────────────
+            const caption = buildCardCaption(result);
 
-            const caption =
-                `🎵 *TikTok Video*\n\n` +
-                `${shortTitle}\n\n` +
-                `👤 *Author:* ${result.author}\n` +
-                `🎞 *Quality:* ${result.quality.toUpperCase()}` +
-                (result.watermark ? "" : " · _no watermark_");
-
-            // ─── 9. Send video ──────────────────────
+            // ─── Send video with card caption ──────
             await ctx.replyWithVideo(
                 new InputFile(videoBuffer, `tiktok_${result.videoId}.mp4`),
                 {
@@ -119,42 +101,81 @@ module.exports = {
                 }
             );
 
-            // ─── 10. Clean up ───────────────────────
-            await ctx.api
-                .deleteMessage(ctx.chat.id, loading.message_id)
-                .catch(() => {});
+            await progress.finish({
+                success: true,
+                title: "Video Sent",
+                extra:
+                    `✓  TikTok delivered\n\n` +
+                    `   ♬ Quality   ➤ ${result.quality.toUpperCase()}\n` +
+                    `   ◉ Author    ➤ ${result.author}\n` +
+                    `   ▣ Watermark ➤ ${result.watermark ? "yes" : "no"}`
+            });
 
-            logger.info(`[/tiktok] ✅ sent to ${ctx.from.id}`);
+            logger.info(`[/tiktok] ✓ sent to ${ctx.from.id}`);
 
         } catch (error) {
             logger.error(`[/tiktok] failed: ${error.message}`);
 
-            const errorText = getErrorMessage(error);
-
-            await ctx.api
-                .editMessageText(ctx.chat.id, loading.message_id, errorText, {
-                    parse_mode: "Markdown"
-                })
-                .catch(() => {
-                    ctx.reply(errorText, { parse_mode: "Markdown" });
-                });
+            await progress.finish({
+                success: false,
+                title: "Download Failed",
+                extra: getErrorMessage(error)
+            });
         }
     }
 };
 
-// ─── Helpers ────────────────────────────────────────
+// ═══════════════════════════════════════════════
+//  Card builder
+// ═══════════════════════════════════════════════
+function buildCardCaption(result) {
+    const title = result.title.length > 100
+        ? result.title.slice(0, 100) + "..."
+        : result.title;
+
+    const quality = result.quality.toUpperCase();
+    const wm = result.watermark ? "wm" : "no wm";
+
+    return (
+        `♬  *TIKTOK VIDEO*\n\n` +
+        `◈ ${title}\n\n` +
+        `◉ Author    ➤  ${result.author}\n` +
+        `▣ Quality   ➤  ${quality} · ${wm}\n` +
+        `⊛ Provider  ➤  ${result.provider}\n\n` +
+        `▸ ✓ successfully downloaded`
+    );
+}
+
+// ═══════════════════════════════════════════════
+//  Helpers
+// ═══════════════════════════════════════════════
 function getErrorMessage(error) {
     if (error.message?.includes("All tiktok providers failed")) {
-        return "❌ *Download failed.*\n\nThis video might be private or unavailable.";
+        return (
+            `✗  Download failed\n\n` +
+            `   This video might be private or unavailable.`
+        );
     }
     if (error.message?.includes("Invalid TikTok URL")) {
-        return "❌ *Invalid TikTok URL.*";
+        return `✗  Invalid TikTok URL`;
     }
     if (error.response?.status === 429) {
-        return "⏳ *Rate limited.*\n\nPlease wait a minute.";
+        return (
+            `◐  Rate limited\n\n` +
+            `   Please wait a minute before trying again.`
+        );
     }
     if (error.code === "ECONNABORTED") {
-        return "⌛ *Download timeout.*\n\nTry again in a moment.";
+        return (
+            `◕  Download timeout\n\n` +
+            `   Connection is too slow today.`
+        );
     }
-    return "❌ *Something went wrong.*\n\nPlease try again later.";
+    if (error.message?.includes("request entity too large")) {
+        return `✗  Video too large for Telegram`;
+    }
+    return (
+        `✗  Something went wrong\n\n` +
+        `   Please try again later.`
+    );
 }
