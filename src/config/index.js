@@ -3,16 +3,17 @@
 //  © BIGSTACK by bigmanjtech™ with ♥︎
 //
 //  Merges:
-//    • env.js          → secrets from .env
-//    • branding.js     → branding + features from config.json
-//    • constants.js    → fixed values
-//    • providers.js    → API provider list
-//    • prefixes.js     → command prefixes
-//    • siteMap.js      → URL → platform detector
-//    • permissions.js  → access control rules
-//    • forceJoin.js    → force-join channels
-//    • reward.js       → daily/referral rewards
-//    • webApp.js       → Mini App config
+//    • env.js              → secrets from .env
+//    • branding.js         → branding + features
+//    • constants.js        → fixed values
+//    • providers.js        → downloader API providers
+//    • searchProviders.js  → search API providers
+//    • prefixes.js         → command prefixes
+//    • siteMap.js          → URL → platform detector
+//    • permissions.js      → access control rules
+//    • forceJoin.js        → force-join channels
+//    • reward.js           → daily/referral rewards
+//    • webApp.js           → Mini App config
 // ──────────────────────────────────────────────────
 
 // ─── Load all modules ───────────────────────────────
@@ -20,6 +21,7 @@ const env = require("./env");
 const branding = require("./branding");
 const constants = require("./constants");
 const providers = require("./providers");
+const searchProviders = require("./searchProviders");
 const prefixes = require("./prefixes");
 const siteMap = require("./siteMap");
 const permissions = require("./permissions");
@@ -29,10 +31,11 @@ const webApp = require("./webApp");
 
 // ─── Master config ──────────────────────────────────
 const config = {
-    // ─── Raw modules (namespace access) ─────────────
+    // ─── Raw modules ────────────────────────────────
     env,
     constants,
-    providers,
+    providers,           // downloader
+    searchProviders,     // search
     prefixes,
     siteMap,
     permissions,
@@ -40,7 +43,7 @@ const config = {
     reward,
     webApp,
 
-    // ─── Branding (spread to top level) ─────────────
+    // ─── Branding (top level) ───────────────────────
     branding: branding.branding,
     owner: branding.owner,
     bot: branding.bot,
@@ -90,9 +93,15 @@ const config = {
         );
     },
 
-    // ─── Helper: Get enabled providers for a command ─
+    // ─── Helper: Downloader providers ───────────────
     getProviders(commandName) {
         const list = providers[commandName] || [];
+        return list.filter((p) => p.enabled !== false);
+    },
+
+    // ─── Helper: Search providers ───────────────────
+    getSearchProviders(commandName) {
+        const list = searchProviders[commandName] || [];
         return list.filter((p) => p.enabled !== false);
     },
 
