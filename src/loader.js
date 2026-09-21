@@ -3,8 +3,8 @@
 //  © BIGSTACK by bigmanjtech™ with ♥︎
 //
 //  Reads every command file, registers with grammY,
-//  and forwards activity to the ACTIVITY group
-//  automatically.
+//  forwards activity to the ACTIVITY group, and
+//  registers callback handlers for inline buttons.
 // ──────────────────────────────────────────────────
 
 const fs = require("fs");
@@ -30,6 +30,7 @@ const DOWNLOAD_CATEGORIES = ["downloader"];
 async function loadCommands(bot) {
     const commandsPath = path.join(__dirname, "commands");
     let totalLoaded = 0;
+    let totalCallbacks = 0;
 
     // ─── Read categories ────────────────────────────
     const categories = fs.readdirSync(commandsPath).filter((folder) => {
@@ -104,6 +105,49 @@ async function loadCommands(bot) {
                         triggers.length > 1 ? "s" : ""
                     })`
                 );
+
+                // ═══════════════════════════════════════════
+                //  CALLBACK REGISTRATION
+                //  For commands with inline buttons
+                // ═══════════════════════════════════════════
+                if (Array.isArray(command.callbacks) && command.callbacks.length > 0) {
+                    for (const cb of command.callbacks) {
+                        if (!cb.pattern || typeof cb.handler !== "function") {
+                            logger.warn(
+                                `[Loader] Skipped callback in ${category}/${command.name}: missing pattern or handler`
+                            );
+                            continue;
+                        }
+
+                        bot.callbackQuery(cb.pattern, async (ctx) => {
+                            try {
+                                // Attach command info to callback ctx
+                                ctx.commandName = command.name;
+                                ctx.commandCategory = category;
+                                ctx.progressProvider = null;
+
+                                await cb.handler(ctx);
+                            } catch (err) {
+                                logger.error(
+                                    `[Callback:${command.name}] ${err.message}`
+                                );
+
+                                await ctx
+                                    .answerCallbackQuery({
+                                        text: "✗  Something went wrong.",
+                                        show_alert: true
+                                    })
+                                    .catch(() => {});
+                            }
+                        });
+
+                        totalCallbacks++;
+                    }
+
+                    logger.info(
+                        `[Loader]   + ${command.callbacks.length} callback(s) for ${command.name}`
+                    );
+                }
             } catch (err) {
                 logger.error(`[Loader] ✗ Failed to load ${category}/${file}: ${err.message}`);
             }
@@ -111,7 +155,8 @@ async function loadCommands(bot) {
     }
 
     logger.info(
-        `[Loader] ✓ Loaded ${totalLoaded} command${totalLoaded !== 1 ? "s" : ""} total`
+        `[Loader] ✓ Loaded ${totalLoaded} command${totalLoaded !== 1 ? "s" : ""} ` +
+        `and ${totalCallbacks} callback${totalCallbacks !== 1 ? "s" : ""} total`
     );
 }
 
