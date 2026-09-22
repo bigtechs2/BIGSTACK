@@ -3,17 +3,19 @@
 //  © BIGSTACK by bigmanjtech™ with ♥︎
 //
 //  Merges:
-//    • env.js              → secrets from .env
-//    • branding.js         → branding + features
-//    • constants.js        → fixed values
-//    • providers.js        → downloader API providers
-//    • searchProviders.js  → search API providers
-//    • prefixes.js         → command prefixes
-//    • siteMap.js          → URL → platform detector
-//    • permissions.js      → access control rules
-//    • forceJoin.js        → force-join channels
-//    • reward.js           → daily/referral rewards
-//    • webApp.js           → Mini App config
+//    • env.js              ⏤ secrets from .env
+//    • branding.js         ⏤ branding + features
+//    • constants.js        ⏤ fixed values
+//    • providers.js        ⏤ downloader providers
+//    • searchProviders.js  ⏤ search providers
+//    • aiProviders.js      ⏤ AI providers
+//    • aiSystemPrompt.js   ⏤ AI identity prompt
+//    • prefixes.js         ⏤ command prefixes
+//    • siteMap.js          ⏤ URL ⏤ platform detector
+//    • permissions.js      ⏤ access control
+//    • forceJoin.js        ⏤ force-join channels
+//    • reward.js           ⏤ daily/referral rewards
+//    • webApp.js           ⏤ Mini App config
 // ──────────────────────────────────────────────────
 
 // ─── Load all modules ───────────────────────────────
@@ -22,6 +24,8 @@ const branding = require("./branding");
 const constants = require("./constants");
 const providers = require("./providers");
 const searchProviders = require("./searchProviders");
+const aiProviders = require("./aiProviders");
+const aiSystemPrompt = require("./aiSystemPrompt");
 const prefixes = require("./prefixes");
 const siteMap = require("./siteMap");
 const permissions = require("./permissions");
@@ -36,6 +40,8 @@ const config = {
     constants,
     providers,           // downloader
     searchProviders,     // search
+    aiProviders,         // AI
+    aiSystemPrompt,      // AI identity
     prefixes,
     siteMap,
     permissions,
@@ -61,8 +67,9 @@ const config = {
     links: branding.links,
     locales: branding.locales,
     theme: branding.theme,
+    ai: branding.ai,
 
-    // ─── Quick access flags ─────────────────────────
+    // ─── Quick flags ────────────────────────────────
     isDev: env.isDev,
     isProd: env.isProd,
     version: branding.branding.version,
@@ -79,12 +86,16 @@ const config = {
     botUsername: branding.bot.username,
     prefix: prefixes.default,
 
-    // ─── Helper: Is a feature enabled? ──────────────
+    // ══════════════════════════════════════════════
+    //  HELPER FUNCTIONS
+    // ══════════════════════════════════════════════
+
+    // ─── Is feature enabled? ────────────────────────
     isEnabled(feature) {
         return branding.features?.[feature] === true;
     },
 
-    // ─── Helper: Get coin cost of a command ─────────
+    // ─── Coin cost of a command ─────────────────────
     getCoinCost(commandName) {
         return (
             branding.coins?.perCommand?.[commandName] ??
@@ -93,49 +104,59 @@ const config = {
         );
     },
 
-    // ─── Helper: Downloader providers ───────────────
+    // ─── Downloader providers ───────────────────────
     getProviders(commandName) {
         const list = providers[commandName] || [];
         return list.filter((p) => p.enabled !== false);
     },
 
-    // ─── Helper: Search providers ───────────────────
+    // ─── Search providers ───────────────────────────
     getSearchProviders(commandName) {
         const list = searchProviders[commandName] || [];
         return list.filter((p) => p.enabled !== false);
     },
 
-    // ─── Helper: Detect platform from URL ───────────
+    // ─── AI providers ───────────────────────────────
+    getAIProviders() {
+        return (aiProviders.chat || []).filter((p) => p.enabled !== false);
+    },
+
+    // ─── AI system prompt ───────────────────────────
+    getSystemPrompt() {
+        return aiSystemPrompt.SYSTEM_PROMPT;
+    },
+
+    // ─── Detect platform from URL ───────────────────
     detectSite(url) {
         return siteMap.detect(url);
     },
 
-    // ─── Helper: Check if URL is supported ──────────
+    // ─── Check if URL is supported ──────────────────
     isSupported(url) {
         return siteMap.isSupported(url);
     },
 
-    // ─── Helper: Is user the owner? ─────────────────
+    // ─── Is user the owner? ─────────────────────────
     isOwner(userId) {
         return String(userId) === String(env.ownerId);
     },
 
-    // ─── Helper: Can user run a command? ────────────
+    // ─── Can user run a command? ────────────────────
     canRun(user, command) {
         return permissions.canRun(user, command);
     },
 
-    // ─── Helper: Daily reward status ────────────────
+    // ─── Daily reward status ────────────────────────
     dailyStatus(lastClaimAt) {
         return reward.canClaimDaily(lastClaimAt);
     },
 
-    // ─── Helper: Force-join status ──────────────────
+    // ─── Force-join status ──────────────────────────
     needsForceJoin() {
         return forceJoin.isEnabled();
     },
 
-    // ─── Helper: Mini App status ────────────────────
+    // ─── Mini App status ────────────────────────────
     hasMiniApp() {
         return webApp.isEnabled();
     }
