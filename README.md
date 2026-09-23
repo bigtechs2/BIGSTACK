@@ -10,4 +10,3 @@ bin wa bot
   }
 
 [bigstack png](https://d.uguu.se/ZDAqWreK.jpg)
-}
