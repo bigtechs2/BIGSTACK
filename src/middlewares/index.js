@@ -58,6 +58,16 @@ function loadMiddlewares(bot) {
     } catch (e) {
         logger.warn(`[middlewares] menuHandler not loaded: ${e.message}`);
     }
+// ══════════════════════════════════════════════
+//  PHONE LISTENER ⏤ /buy phone input
+// ══════════════════════════════════════════════
+try {
+    const phoneListener = require("./phoneListener");
+    bot.use(phoneListener);
+    logger.info("[middlewares] ✓ phoneListener");
+} catch (e) {
+    logger.warn(`[middlewares] phoneListener not loaded: ${e.message}`);
+}
 
     // ══════════════════════════════════════════════
     //  4. FORCE JOIN — blocks users not in channels
