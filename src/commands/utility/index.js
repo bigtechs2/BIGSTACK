@@ -11,5 +11,8 @@ module.exports = {
     balance: require("./balance"),
     daily: require("./daily"),
     refer: require("./refer"),
+    profile: require("./profile"),
+    store: require("./store"),
+    settings: require("./settings"),
     ai: require("./ai")
 };
