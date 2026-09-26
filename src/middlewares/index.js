@@ -11,29 +11,21 @@
 //    5. coinGuard      — deducts coins
 //    6. rateLimit      — per-user throttle
 //    7. language       — loads user's language
+//    8. aiListener     — catches plain messages for AI
 // ──────────────────────────────────────────────────
 
 const logger = require("../core/logger");
 const config = require("../config");
 
 // ══════════════════════════════════════════════════
-//  📥 IMPORT MIDDLEWARES
+//  IMPORT MIDDLEWARES
 // ══════════════════════════════════════════════════
 
-// ─── Currently built ────────────────────────────────
 const errorHandler = require("./errorHandler");
 const userLogger = require("./userLogger");
 
-// ─── To build later (uncomment when ready) ──────────
-// const forceJoin = require("./forceJoin");
-// const permission = require("./permission");
-// const coinGuard = require("./coinGuard");
-// const rateLimit = require("./rateLimit");
-// const language = require("./language");
-// const branding = require("./branding");
-
 // ══════════════════════════════════════════════════
-//  🔧 REGISTER MIDDLEWARES
+//  REGISTER MIDDLEWARES
 // ══════════════════════════════════════════════════
 
 function loadMiddlewares(bot) {
@@ -45,90 +37,100 @@ function loadMiddlewares(bot) {
     //  Catches every error from downstream
     // ══════════════════════════════════════════════
     bot.use(errorHandler);
-    logger.info("[middlewares] ✅ errorHandler (1st)");
+    logger.info("[middlewares] ✓ errorHandler (1st)");
 
     // ══════════════════════════════════════════════
     //  2. USER LOGGER — registers users, tracks stats
     //  Runs on every message before commands
     // ══════════════════════════════════════════════
     bot.use(userLogger);
-    logger.info("[middlewares] ✅ userLogger");
+    logger.info("[middlewares] ✓ userLogger");
 
     // ══════════════════════════════════════════════
     //  3. FORCE JOIN — blocks users not in channels
-    //  (uncomment when forceJoin.js is built)
     // ══════════════════════════════════════════════
     if (config.forceJoin?.enabled) {
         try {
             const forceJoin = require("./forceJoin");
             bot.use(forceJoin);
-            logger.info("[middlewares] ✅ forceJoin");
+            logger.info("[middlewares] ✓ forceJoin");
         } catch {
-            logger.warn("[middlewares] ⚠️  forceJoin enabled in config but file missing");
+            logger.warn("[middlewares] ⚠  forceJoin enabled in config but file missing");
         }
     }
 
     // ══════════════════════════════════════════════
     //  4. PERMISSION — owner/admin/premium checks
-    //  (uncomment when permission.js is built)
     // ══════════════════════════════════════════════
     try {
         const permission = require("./permission");
         bot.use(permission);
-        logger.info("[middlewares] ✅ permission");
+        logger.info("[middlewares] ✓ permission");
     } catch {
-        // Not built yet — skip silently
+        // Not built yet ⏤ skip silently
     }
 
     // ══════════════════════════════════════════════
     //  5. COIN GUARD — deducts coins per command
-    //  (uncomment when coinGuard.js is built)
     // ══════════════════════════════════════════════
     try {
         const coinGuard = require("./coinGuard");
         bot.use(coinGuard);
-        logger.info("[middlewares] ✅ coinGuard");
+        logger.info("[middlewares] ✓ coinGuard");
     } catch {
         // Not built yet
     }
 
     // ══════════════════════════════════════════════
     //  6. RATE LIMIT — per-user throttle
-    //  (uncomment when rateLimit.js is built)
     // ══════════════════════════════════════════════
     try {
         const rateLimit = require("./rateLimit");
         bot.use(rateLimit);
-        logger.info("[middlewares] ✅ rateLimit");
+        logger.info("[middlewares] ✓ rateLimit");
     } catch {
         // Not built yet
     }
 
     // ══════════════════════════════════════════════
     //  7. LANGUAGE — loads user's preferred language
-    //  (uncomment when language.js is built)
     // ══════════════════════════════════════════════
     try {
         const language = require("./language");
         bot.use(language);
-        logger.info("[middlewares] ✅ language");
+        logger.info("[middlewares] ✓ language");
     } catch {
         // Not built yet
     }
 
-    logger.info("[middlewares] ✅ all loaded");
+    // ══════════════════════════════════════════════
+    //  8. AI LISTENER — catches plain messages
+    //  Runs AFTER all guards, BEFORE commands.
+    //  If user has AI ON, this routes their message
+    //  to the AI service. If AI is OFF, it passes
+    //  through to the command handlers.
+    // ══════════════════════════════════════════════
+    try {
+        const aiListener = require("./aiListener");
+        bot.use(aiListener);
+        logger.info("[middlewares] ✓ aiListener");
+    } catch (e) {
+        logger.warn(`[middlewares] aiListener not loaded: ${e.message}`);
+    }
+
+    logger.info("[middlewares] ✓ all loaded");
     logger.info("─────────────────────────────────────────────");
 }
 
 // ══════════════════════════════════════════════════
-//  🧹 CLEANUP ALL MIDDLEWARES
+//  CLEANUP ALL MIDDLEWARES
 // ══════════════════════════════════════════════════
 
 function cleanupMiddlewares() {
     try {
         if (errorHandler.cleanup) errorHandler.cleanup();
         if (userLogger.cleanup) userLogger.cleanup();
-        logger.info("[middlewares] ✅ cleaned up");
+        logger.info("[middlewares] ✓ cleaned up");
     } catch (err) {
         logger.warn(`[middlewares] cleanup failed: ${err.message}`);
     }
