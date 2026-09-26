@@ -1,6 +1,6 @@
 // ──────────────────────────────────────────────────
-//  BIGSTACK — /approve and /reject
-//  Admin approves manual payments
+//  BIGSTACK — /pending, /approve, /reject
+//  Admin payment management
 //  © BIGSTACK by bigmanjtech™ with ♥︎
 // ──────────────────────────────────────────────────
 
@@ -10,7 +10,7 @@ const manual = require("../../services/payment/manual.service");
 const Payment = require("../../database/models/Payment");
 
 // ══════════════════════════════════════════════════
-//  /pending ⏤ list pending payments
+//  /pending
 // ══════════════════════════════════════════════════
 const pendingCommand = {
     name: "pending",
@@ -48,7 +48,7 @@ const pendingCommand = {
             text += `   Method    ➤ ${p.method}\n`;
             text += `   Amount    ➤ ${p.amountPaid}\n`;
             text += `   Reference ➤ ${p.reference || "none"}\n`;
-            text += `   Payment ID ➤ \`${p._id}\`\n\n`;
+            text += `   Payment   ➤ \`${p._id}\`\n\n`;
         }
 
         if (pending.length > 10) {
@@ -108,21 +108,23 @@ const approveCommand = {
 
             // ─── Notify user ─────────────────────
             try {
-                const message = payment.itemType === "coins"
-                    ? `✓ *Payment Approved*\n\n` +
-                      `▸ You received ➤ +${payment.coinsAmount} 🪙\n` +
-                      `▸ New balance  ➤ ${user.coins} 🪙\n\n` +
-                      `▸ Thanks for your purchase!`
-                    : `✓ *Premium Activated*\n\n` +
-                      `▸ Plan     ➤ ${payment.itemLabel}\n` +
-                      `▸ Expires  ➤ ${user.premiumExpiry?.toLocaleDateString("en-GB")}\n\n` +
-                      `▸ Enjoy premium features!`;
+                const message =
+                    payment.itemType === "coins"
+                        ? `✓ *Payment Approved*\n\n` +
+                          `▸ You received ➤ +${payment.coinsAmount} 🪙\n` +
+                          `▸ New balance  ➤ ${user.coins} 🪙\n\n` +
+                          `▸ Thanks for your purchase!`
+                        : `✓ *Premium Activated*\n\n` +
+                          `▸ Plan     ➤ ${payment.itemLabel}\n` +
+                          `▸ Expires  ➤ ${user.premiumExpiry?.toLocaleDateString("en-GB")}\n\n` +
+                          `▸ Enjoy premium features!`;
 
-                await ctx.api.sendMessage(user.telegramId, message, { parse_mode: "Markdown" });
+                await ctx.api.sendMessage(user.telegramId, message, {
+                    parse_mode: "Markdown"
+                });
             } catch {
                 // User may have blocked the bot
             }
-
         } catch (err) {
             logger.error(`[/approve] ${err.message}`);
             await ctx.reply(
@@ -187,7 +189,6 @@ const rejectCommand = {
             } catch {
                 // User may have blocked the bot
             }
-
         } catch (err) {
             logger.error(`[/reject] ${err.message}`);
             await ctx.reply(
