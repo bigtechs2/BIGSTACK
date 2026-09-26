@@ -4,7 +4,7 @@
 // ──────────────────────────────────────────────────
 
 const { Bot } = require("grammy");
-const { hydrateReply, parseMode } = require("@grammyjs/parse-mode");
+const { hydrateReply } = require("@grammyjs/parse-mode");
 const { autoRetry } = require("@grammyjs/auto-retry");
 const { stream } = require("@grammyjs/stream");
 
@@ -22,37 +22,131 @@ const bot = new Bot(process.env.BOT_TOKEN, {
     }
 });
 
-// ─── Attach config to bot ───────────────────────────
+// ─── Attach config ──────────────────────────────────
 bot.config = config;
 
 // ══════════════════════════════════════════════════
 //  RICH MESSAGE PLUGINS
 // ══════════════════════════════════════════════════
 
-// ─── 1. Auto-retry (needed by stream) ───────────────
-// Handles Telegram rate limits automatically
-bot.api.config.use(autoRetry({
-    maxRetryAttempts: 3,
-    maxDelaySeconds: 5
-}));
+// ─── 1. Auto-retry ──────────────────────────────────
+bot.api.config.use(
+    autoRetry({
+        maxRetryAttempts: 3,
+        maxDelaySeconds: 5
+    })
+);
 
-// ─── 2. Parse mode — enables ctx.replyWithHTML, etc. ─
+// ─── 2. Parse mode ──────────────────────────────────
 bot.use(hydrateReply);
 
-// ─── 3. Stream — live typing updates ────────────────
+// ─── 3. Stream ──────────────────────────────────────
 bot.use(stream());
 
 // ══════════════════════════════════════════════════
 //  ATTACH BOT TO LOGGER
-//  Now logger can send messages to your 3 groups
 // ══════════════════════════════════════════════════
 
 logger.attachBot(bot);
 
 // ══════════════════════════════════════════════════
+//  PAYMENT HANDLERS
+// ══════════════════════════════════════════════════
+
+// ─── Pre-checkout query ─────────────────────────────
+bot.on("pre_checkout_query", async (ctx) => {
+    try {
+        const starsService = require("./services/payment/stars.service");
+        await starsService.preCheckout(ctx);
+    } catch (err) {
+        logger.error(`[stars] precheckout failed: ${err.message}`);
+        await ctx.answerPreCheckoutQuery(false, "Payment failed").catch(() => {});
+    }
+});
+
+// ─── Successful payment ─────────────────────────────
+bot.on("message:successful_payment", async (ctx) => {
+    try {
+        const User = require("./database/models/User");
+        const Transaction = require("./database/models/Transaction");
+        const starsService = require("./services/payment/stars.service");
+
+        const payment = ctx.message.successful_payment;
+        const parsed = starsService.parsePayload(payment.invoice_payload);
+
+        if (!parsed) return;
+
+        const { itemId } = parsed;
+        const user = await User.findOne({ telegramId: String(ctx.from.id) });
+        if (!user) return;
+
+        const coinPkg = starsService.COIN_PACKAGES[itemId];
+        const premiumPlan = starsService.PREMIUM_PLANS[itemId];
+
+        if (coinPkg) {
+            // ─── Credit coins ─────────────────────
+            user.coins += coinPkg.coins;
+            user.totalEarned += coinPkg.coins;
+            await user.save();
+
+            await Transaction.log({
+                userId: user.telegramId,
+                type: "buy",
+                amount: coinPkg.coins,
+                balanceAfter: user.coins,
+                reason: `Purchased ${coinPkg.label}`,
+                source: "stars",
+                payment: {
+                    method: "stars",
+                    reference: payment.telegram_payment_charge_id,
+                    amountPaid: `${payment.total_amount} Stars`
+                }
+            });
+
+            await ctx.reply(
+                `✓ *Payment Successful*\n\n` +
+                `▸ Coins received ➤ +${coinPkg.coins} 🪙\n` +
+                `▸ New balance    ➤ ${user.coins} 🪙\n\n` +
+                `▸ Thanks for your purchase!`,
+                { parse_mode: "Markdown" }
+            );
+        } else if (premiumPlan) {
+            // ─── Grant premium ────────────────────
+            const plan = itemId.replace("premium_", "");
+            user.upgradePremium(plan);
+            await user.save();
+
+            await Transaction.log({
+                userId: user.telegramId,
+                type: "premium",
+                amount: 0,
+                balanceAfter: user.coins,
+                reason: `Purchased ${premiumPlan.label}`,
+                source: "stars",
+                payment: {
+                    method: "stars",
+                    reference: payment.telegram_payment_charge_id,
+                    amountPaid: `${payment.total_amount} Stars`
+                }
+            });
+
+            await ctx.reply(
+                `✓ *Premium Activated*\n\n` +
+                `▸ Plan     ➤ ${premiumPlan.label}\n` +
+                `▸ Expires  ➤ ${user.premiumExpiry.toLocaleDateString("en-GB")}\n\n` +
+                `▸ Enjoy premium features!`,
+                { parse_mode: "Markdown" }
+            );
+        }
+
+        logger.info(`[stars] payment success: ${ctx.from.id} → ${itemId}`);
+    } catch (err) {
+        logger.error(`[stars] payment handler failed: ${err.message}`);
+    }
+});
+
+// ══════════════════════════════════════════════════
 //  GLOBAL ERROR HANDLER
-//  Catches errors that escape middleware + command
-//  Forwards full error to ERRORS group
 // ══════════════════════════════════════════════════
 
 bot.catch(async (err) => {
@@ -69,7 +163,7 @@ bot.catch(async (err) => {
         logger.warn(`[bot.catch] forwarding failed: ${e.message}`);
     }
 
-    // ─── 3. Reply to user (avoid double-reply) ──────
+    // ─── 3. Reply to user ───────────────────────────
     try {
         if (ctx && typeof ctx.reply === "function") {
             if (!ctx.__errorReplied) {
@@ -81,7 +175,7 @@ bot.catch(async (err) => {
             }
         }
     } catch {
-        // User may have blocked the bot — ignore
+        // User may have blocked the bot
     }
 });
 
