@@ -6,12 +6,13 @@
 //  Order matters:
 //    1. errorHandler   — must be FIRST (catches all)
 //    2. userLogger     — registers users, tracks stats
-//    3. forceJoin      — blocks unjoined users
-//    4. permission     — checks owner/admin/premium
-//    5. coinGuard      — deducts coins
-//    6. rateLimit      — per-user throttle
-//    7. language       — loads user's language
-//    8. aiListener     — catches plain messages for AI
+//    3. menuHandler    — handles menu:* buttons
+//    4. forceJoin      — blocks unjoined users
+//    5. permission     — checks owner/admin/premium
+//    6. coinGuard      — deducts coins
+//    7. rateLimit      — per-user throttle
+//    8. language       — loads user's language
+//    9. aiListener     — catches plain messages for AI
 // ──────────────────────────────────────────────────
 
 const logger = require("../core/logger");
@@ -47,7 +48,19 @@ function loadMiddlewares(bot) {
     logger.info("[middlewares] ✓ userLogger");
 
     // ══════════════════════════════════════════════
-    //  3. FORCE JOIN — blocks users not in channels
+    //  3. MENU HANDLER — handles menu:* buttons
+    //  Routes menu taps to category screens.
+    // ══════════════════════════════════════════════
+    try {
+        const menuHandler = require("./menuHandler");
+        bot.use(menuHandler);
+        logger.info("[middlewares] ✓ menuHandler");
+    } catch (e) {
+        logger.warn(`[middlewares] menuHandler not loaded: ${e.message}`);
+    }
+
+    // ══════════════════════════════════════════════
+    //  4. FORCE JOIN — blocks users not in channels
     // ══════════════════════════════════════════════
     if (config.forceJoin?.enabled) {
         try {
@@ -60,7 +73,7 @@ function loadMiddlewares(bot) {
     }
 
     // ══════════════════════════════════════════════
-    //  4. PERMISSION — owner/admin/premium checks
+    //  5. PERMISSION — owner/admin/premium checks
     // ══════════════════════════════════════════════
     try {
         const permission = require("./permission");
@@ -71,7 +84,7 @@ function loadMiddlewares(bot) {
     }
 
     // ══════════════════════════════════════════════
-    //  5. COIN GUARD — deducts coins per command
+    //  6. COIN GUARD — deducts coins per command
     // ══════════════════════════════════════════════
     try {
         const coinGuard = require("./coinGuard");
@@ -82,7 +95,7 @@ function loadMiddlewares(bot) {
     }
 
     // ══════════════════════════════════════════════
-    //  6. RATE LIMIT — per-user throttle
+    //  7. RATE LIMIT — per-user throttle
     // ══════════════════════════════════════════════
     try {
         const rateLimit = require("./rateLimit");
@@ -93,7 +106,7 @@ function loadMiddlewares(bot) {
     }
 
     // ══════════════════════════════════════════════
-    //  7. LANGUAGE — loads user's preferred language
+    //  8. LANGUAGE — loads user's preferred language
     // ══════════════════════════════════════════════
     try {
         const language = require("./language");
@@ -104,7 +117,7 @@ function loadMiddlewares(bot) {
     }
 
     // ══════════════════════════════════════════════
-    //  8. AI LISTENER — catches plain messages
+    //  9. AI LISTENER — catches plain messages
     //  Runs AFTER all guards, BEFORE commands.
     //  If user has AI ON, this routes their message
     //  to the AI service. If AI is OFF, it passes
