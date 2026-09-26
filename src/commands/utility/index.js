@@ -8,15 +8,8 @@ module.exports = {
     menu: require("./menu"),
     help: require("./help"),
     about: require("./about"),
+    balance: require("./balance"),
+    daily: require("./daily"),
+    refer: require("./refer"),
     ai: require("./ai")
-    // Add more as you build:
-    // daily: require("./daily"),
-    // balance: require("./balance"),
-    // profile: require("./profile"),
-    // refer: require("./refer"),
-    // store: require("./store"),
-    // settings: require("./settings"),
-    // lang: require("./lang"),
-    // stats: require("./stats"),
-    // broadcast: require("./broadcast"),
 };
