@@ -1,7 +1,11 @@
 // ──────────────────────────────────────────────────
 //  BIGSTACK — AI Listener Middleware
 //  © BIGSTACK by bigmanjtech™ with ♥︎
-// ══════════════════════════════════════════════════
+//
+//  Catches plain messages from users with AI ON.
+//  Routes to chat / image gen / voice / vision.
+//  Persists every message to MongoDB forever.
+// ──────────────────────────────────────────────────
 
 const fs = require("fs");
 const { InputFile } = require("grammy");
@@ -12,6 +16,7 @@ const imageService = require("../services/ai/image.service");
 const visionService = require("../services/ai/vision.service");
 const voiceService = require("../services/ai/voice.service");
 const musicService = require("../services/ai/music.service");
+const memory = require("../services/ai/memory.service");
 const uploadService = require("../services/upload/nexray.service");
 const { downloadTelegramFile, deleteFile } = require("../utils/fileHelpers");
 
@@ -82,6 +87,9 @@ async function aiListener(ctx, next) {
 //  Handle text ⏤ chat or image gen
 // ══════════════════════════════════════════════════
 async function handleText(ctx, prompt) {
+    const userId = String(ctx.from.id);
+    const chatId = String(ctx.chat.id);
+
     // Detect image generation intent
     const imageKeywords = /\b(create|generate|draw|make|paint)\s+(an?\s+)?(image|picture|photo|art|illustration)/i;
     if (imageKeywords.test(prompt)) {
@@ -94,8 +102,27 @@ async function handleText(ctx, prompt) {
     } catch { return; }
 
     try {
-        const result = await aiService.chat(prompt);
-        const used = await session.incrementUsed(String(ctx.from.id));
+        // ─── Load memory ─────────────────────────
+        const history = await memory.getRecent(userId, 20);
+
+        // ─── Save user message ───────────────────
+        await memory.save(userId, "user", prompt, {
+            chatId,
+            type: "text"
+        });
+
+        // ─── Get AI reply with memory ────────────
+        const result = await aiService.chat(prompt, history);
+
+        // ─── Save assistant reply ────────────────
+        await memory.save(userId, "assistant", result.reply, {
+            chatId,
+            type: "text",
+            provider: result.provider
+        });
+
+        // ─── Track usage ─────────────────────────
+        const used = await session.incrementUsed(userId);
         const remaining = Math.max(0, session.FREE_DAILY_LIMIT - used);
 
         const footer = remaining > 0
@@ -105,19 +132,31 @@ async function handleText(ctx, prompt) {
         const chunks = splitMessage(`◈ ${result.reply}${footer}`, 3900);
 
         try {
-            await ctx.api.editMessageText(ctx.chat.id, thinking.message_id, chunks[0], { parse_mode: "Markdown" });
+            await ctx.api.editMessageText(
+                ctx.chat.id,
+                thinking.message_id,
+                chunks[0],
+                { parse_mode: "Markdown" }
+            );
         } catch {
-            await ctx.api.editMessageText(ctx.chat.id, thinking.message_id, chunks[0]).catch(() => {});
+            await ctx.api
+                .editMessageText(ctx.chat.id, thinking.message_id, chunks[0])
+                .catch(() => {});
         }
 
         for (let i = 1; i < chunks.length; i++) {
-            try { await ctx.reply(chunks[i], { parse_mode: "Markdown" }); }
-            catch { await ctx.reply(chunks[i]).catch(() => {}); }
+            try {
+                await ctx.reply(chunks[i], { parse_mode: "Markdown" });
+            } catch {
+                await ctx.reply(chunks[i]).catch(() => {});
+            }
         }
 
     } catch (err) {
         logger.error(`[aiListener text] ${err.message}`);
-        await ctx.api.editMessageText(ctx.chat.id, thinking.message_id, "✗  AI unavailable. Try again.").catch(() => {});
+        await ctx.api
+            .editMessageText(ctx.chat.id, thinking.message_id, "✗  AI unavailable. Try again.")
+            .catch(() => {});
     }
 }
 
@@ -125,43 +164,67 @@ async function handleText(ctx, prompt) {
 //  Handle image generation
 // ══════════════════════════════════════════════════
 async function handleImageGen(ctx, prompt) {
+    const userId = String(ctx.from.id);
+    const chatId = String(ctx.chat.id);
+
     let thinking;
-    try { thinking = await ctx.reply("◐ Generating image..."); }
-    catch { return; }
+    try {
+        thinking = await ctx.reply("◐ Generating image...");
+    } catch { return; }
 
     try {
-        const cleanPrompt = prompt.replace(/^(create|generate|draw|make|paint)\s+(an?\s+)?(image|picture|photo|art|illustration)\s+(of|about)?\s*/i, "").trim();
+        const cleanPrompt = prompt
+            .replace(/^(create|generate|draw|make|paint)\s+(an?\s+)?(image|picture|photo|art|illustration)\s+(of|about)?\s*/i, "")
+            .trim();
+
         const result = await imageService.generate(cleanPrompt || prompt);
+
+        // ─── Save to memory ──────────────────────
+        await memory.save(userId, "user", prompt, {
+            chatId,
+            type: "text"
+        });
+        await memory.save(userId, "assistant", `[Generated image] ${cleanPrompt}`, {
+            chatId,
+            type: "image",
+            provider: result.provider,
+            mediaUrl: result.url
+        });
 
         await ctx.api.deleteMessage(ctx.chat.id, thinking.message_id).catch(() => {});
         await ctx.replyWithPhoto(result.url, {
-            caption: `◈ *Generated*\n\n◉ Prompt ➤ ${cleanPrompt || prompt}\n⊛ Provider ➤ ${result.provider}`,
+            caption:
+                `◈ *Generated*\n\n` +
+                `◉ Prompt ➤ ${cleanPrompt || prompt}\n` +
+                `⊛ Provider ➤ ${result.provider}`,
             parse_mode: "Markdown"
         });
 
     } catch (err) {
         logger.error(`[aiListener image] ${err.message}`);
-        await ctx.api.editMessageText(ctx.chat.id, thinking.message_id, "✗  Image generation failed.").catch(() => {});
+        await ctx.api
+            .editMessageText(ctx.chat.id, thinking.message_id, "✗  Image generation failed.")
+            .catch(() => {});
     }
 }
 
 // ══════════════════════════════════════════════════
-//  Handle voice note (STT + optional music recognition)
+//  Handle voice note (STT + chat)
 // ══════════════════════════════════════════════════
 async function handleVoice(ctx, voiceObj) {
+    const userId = String(ctx.from.id);
+    const chatId = String(ctx.chat.id);
+
     let thinking;
-    try { thinking = await ctx.reply("◐ Listening..."); }
-    catch { return; }
+    try {
+        thinking = await ctx.reply("◐ Listening...");
+    } catch { return; }
 
     let filePath = null;
 
     try {
         filePath = await downloadTelegramFile(ctx, voiceObj.file_id, "ogg");
-
-        // Upload to Nexray
         const uploaded = await uploadService.upload(filePath);
-
-        // Transcribe
         const { text } = await voiceService.speechToText(filePath, "en");
 
         await ctx.api.editMessageText(
@@ -171,24 +234,54 @@ async function handleVoice(ctx, voiceObj) {
             { parse_mode: "Markdown" }
         );
 
-        const result = await aiService.chat(text);
+        // ─── Load memory ─────────────────────────
+        const history = await memory.getRecent(userId, 20);
+
+        // ─── Save user voice message ─────────────
+        await memory.save(userId, "user", text, {
+            chatId,
+            type: "voice",
+            mediaUrl: uploaded.url
+        });
+
+        // ─── Get AI reply ────────────────────────
+        const result = await aiService.chat(text, history);
+
+        // ─── Save assistant reply ────────────────
+        await memory.save(userId, "assistant", result.reply, {
+            chatId,
+            type: "text",
+            provider: result.provider
+        });
 
         const chunks = splitMessage(`◈ ${result.reply}`, 3900);
 
         try {
-            await ctx.api.editMessageText(ctx.chat.id, thinking.message_id, chunks[0], { parse_mode: "Markdown" });
+            await ctx.api.editMessageText(
+                ctx.chat.id,
+                thinking.message_id,
+                chunks[0],
+                { parse_mode: "Markdown" }
+            );
         } catch {
-            await ctx.api.editMessageText(ctx.chat.id, thinking.message_id, chunks[0]).catch(() => {});
+            await ctx.api
+                .editMessageText(ctx.chat.id, thinking.message_id, chunks[0])
+                .catch(() => {});
         }
 
         for (let i = 1; i < chunks.length; i++) {
-            try { await ctx.reply(chunks[i], { parse_mode: "Markdown" }); }
-            catch { await ctx.reply(chunks[i]).catch(() => {}); }
+            try {
+                await ctx.reply(chunks[i], { parse_mode: "Markdown" });
+            } catch {
+                await ctx.reply(chunks[i]).catch(() => {});
+            }
         }
 
     } catch (err) {
         logger.error(`[aiListener voice] ${err.message}`);
-        await ctx.api.editMessageText(ctx.chat.id, thinking.message_id, "✗  Could not process voice.").catch(() => {});
+        await ctx.api
+            .editMessageText(ctx.chat.id, thinking.message_id, "✗  Could not process voice.")
+            .catch(() => {});
     } finally {
         deleteFile(filePath);
     }
@@ -198,9 +291,13 @@ async function handleVoice(ctx, voiceObj) {
 //  Handle photo (vision)
 // ══════════════════════════════════════════════════
 async function handleImage(ctx, photoArray, userPrompt) {
+    const userId = String(ctx.from.id);
+    const chatId = String(ctx.chat.id);
+
     let thinking;
-    try { thinking = await ctx.reply("◐ Analyzing image..."); }
-    catch { return; }
+    try {
+        thinking = await ctx.reply("◐ Analyzing image...");
+    } catch { return; }
 
     let filePath = null;
 
@@ -212,22 +309,40 @@ async function handleImage(ctx, photoArray, userPrompt) {
         const prompt = userPrompt || "Describe this image in detail.";
         const result = await visionService.describe(uploaded.url, prompt);
 
-        await ctx.api.editMessageText(
-            ctx.chat.id,
-            thinking.message_id,
-            `◈ *Image Description*\n\n${result.description}`,
-            { parse_mode: "Markdown" }
-        ).catch(async () => {
-            await ctx.api.editMessageText(
+        // ─── Save to memory ──────────────────────
+        await memory.save(userId, "user", prompt, {
+            chatId,
+            type: "image",
+            mediaUrl: uploaded.url
+        });
+        await memory.save(userId, "assistant", result.description, {
+            chatId,
+            type: "text",
+            provider: result.provider
+        });
+
+        await ctx.api
+            .editMessageText(
                 ctx.chat.id,
                 thinking.message_id,
-                `◈ Image Description\n\n${result.description}`
-            ).catch(() => {});
-        });
+                `◈ *Image Description*\n\n${result.description}`,
+                { parse_mode: "Markdown" }
+            )
+            .catch(async () => {
+                await ctx.api
+                    .editMessageText(
+                        ctx.chat.id,
+                        thinking.message_id,
+                        `◈ Image Description\n\n${result.description}`
+                    )
+                    .catch(() => {});
+            });
 
     } catch (err) {
         logger.error(`[aiListener vision] ${err.message}`);
-        await ctx.api.editMessageText(ctx.chat.id, thinking.message_id, "✗  Could not analyze image.").catch(() => {});
+        await ctx.api
+            .editMessageText(ctx.chat.id, thinking.message_id, "✗  Could not analyze image.")
+            .catch(() => {});
     } finally {
         deleteFile(filePath);
     }
