@@ -8,19 +8,19 @@ const config = require("../../config");
 const logger = require("../../core/logger");
 
 // ══════════════════════════════════════════════════
-//  Store layout
+//  Store layout ⏤ all under 1000 ⭐
 // ══════════════════════════════════════════════════
 const COIN_PACKAGES = [
-    { id: "coins_100",  coins: 100,  stars: 30,  label: "100 Coins" },
-    { id: "coins_500",  coins: 500,  stars: 140, label: "500 Coins" },
-    { id: "coins_1000", coins: 1000, stars: 260, label: "1000 Coins" },
-    { id: "coins_5000", coins: 5000, stars: 1100, label: "5000 Coins" }
+    { id: "coins_100",  coins: 100,  stars: 30,   label: "100 Coins" },
+    { id: "coins_500",  coins: 500,  stars: 140,  label: "500 Coins" },
+    { id: "coins_1000", coins: 1000, stars: 260,  label: "1000 Coins" },
+    { id: "coins_5000", coins: 5000, stars: 1000, label: "5000 Coins" }
 ];
 
 const PREMIUM_PLANS = [
     { id: "premium_weekly",  label: "Weekly",  stars: 150,  days: 7 },
-    { id: "premium_monthly", label: "Monthly", stars: 500,  days: 30 },
-    { id: "premium_yearly",  label: "Yearly",  stars: 4500, days: 365 }
+    { id: "premium_monthly", label: "Monthly", stars: 450,  days: 30 },
+    { id: "premium_yearly",  label: "Yearly",  stars: 1000, days: 365 }
 ];
 
 // ══════════════════════════════════════════════════
@@ -36,12 +36,12 @@ function buildStore(balance, premiumActive) {
         `   ➤ 100 Coins     ➤ 30 ⭐\n` +
         `   ➤ 500 Coins     ➤ 140 ⭐\n` +
         `   ➤ 1000 Coins    ➤ 260 ⭐\n` +
-        `   ➤ 5000 Coins    ➤ 1100 ⭐\n\n` +
+        `   ➤ 5000 Coins    ➤ 1000 ⭐\n\n` +
 
         `★ *Premium Plans*\n` +
         `   ➤ Weekly        ➤ 150 ⭐\n` +
-        `   ➤ Monthly       ➤ 500 ⭐\n` +
-        `   ➤ Yearly        ➤ 4500 ⭐\n\n` +
+        `   ➤ Monthly       ➤ 450 ⭐\n` +
+        `   ➤ Yearly        ➤ 1000 ⭐\n\n` +
 
         `▸ Premium = unlimited AI, no coin costs,\n` +
         `   priority downloads, ×3 daily coins.\n\n` +
@@ -62,16 +62,16 @@ function buildStoreKeyboard() {
             ],
             [
                 { text: "1000 Coins · 260 ⭐", callback_data: "store:coins_1000" },
-                { text: "5000 Coins · 1100 ⭐", callback_data: "store:coins_5000" }
+                { text: "5000 Coins · 1000 ⭐", callback_data: "store:coins_5000" }
             ],
             [
-                { text: "★ Weekly Premium · 150 ⭐", callback_data: "store:premium_weekly" }
+                { text: "★ Weekly · 150 ⭐", callback_data: "store:premium_weekly" }
             ],
             [
-                { text: "★ Monthly Premium · 500 ⭐", callback_data: "store:premium_monthly" }
+                { text: "★ Monthly · 450 ⭐", callback_data: "store:premium_monthly" }
             ],
             [
-                { text: "★ Yearly Premium · 4500 ⭐", callback_data: "store:premium_yearly" }
+                { text: "★ Yearly · 1000 ⭐", callback_data: "store:premium_yearly" }
             ],
             [
                 { text: "◀ Back", callback_data: "menu:home" }
@@ -129,7 +129,6 @@ module.exports = {
                     show_alert: true
                 });
 
-                // Send a placeholder message
                 await ctx.reply(
                     `◈ *Payment Setup*\n\n` +
                     `▸ Item    ➤ ${type === "coins" ? `${id} coins` : `${id} premium`}\n` +
