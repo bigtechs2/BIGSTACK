@@ -67,9 +67,11 @@ function loadMiddlewares(bot) {
             const forceJoin = require("./forceJoin");
             bot.use(forceJoin);
             logger.info("[middlewares] ✓ forceJoin");
-        } catch {
-            logger.warn("[middlewares] ⚠  forceJoin enabled in config but file missing");
+        } catch (e) {
+            logger.warn(`[middlewares] forceJoin enabled but not loaded: ${e.message}`);
         }
+    } else {
+        logger.info("[middlewares] ⏤ forceJoin disabled in config");
     }
 
     // ══════════════════════════════════════════════
@@ -79,8 +81,8 @@ function loadMiddlewares(bot) {
         const permission = require("./permission");
         bot.use(permission);
         logger.info("[middlewares] ✓ permission");
-    } catch {
-        // Not built yet ⏤ skip silently
+    } catch (e) {
+        logger.warn(`[middlewares] permission not loaded: ${e.message}`);
     }
 
     // ══════════════════════════════════════════════
@@ -90,8 +92,8 @@ function loadMiddlewares(bot) {
         const coinGuard = require("./coinGuard");
         bot.use(coinGuard);
         logger.info("[middlewares] ✓ coinGuard");
-    } catch {
-        // Not built yet
+    } catch (e) {
+        logger.warn(`[middlewares] coinGuard not loaded: ${e.message}`);
     }
 
     // ══════════════════════════════════════════════
@@ -101,8 +103,8 @@ function loadMiddlewares(bot) {
         const rateLimit = require("./rateLimit");
         bot.use(rateLimit);
         logger.info("[middlewares] ✓ rateLimit");
-    } catch {
-        // Not built yet
+    } catch (e) {
+        logger.warn(`[middlewares] rateLimit not loaded: ${e.message}`);
     }
 
     // ══════════════════════════════════════════════
@@ -112,8 +114,8 @@ function loadMiddlewares(bot) {
         const language = require("./language");
         bot.use(language);
         logger.info("[middlewares] ✓ language");
-    } catch {
-        // Not built yet
+    } catch (e) {
+        logger.warn(`[middlewares] language not loaded: ${e.message}`);
     }
 
     // ══════════════════════════════════════════════
