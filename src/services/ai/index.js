@@ -4,5 +4,6 @@ module.exports = {
     vision: require("./vision.service"),
     voice: require("./voice.service"),
     music: require("./music.service"),
-    session: require("./session.service")
+    session: require("./session.service"),
+    memory: require("./memory.service")
 };
