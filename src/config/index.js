@@ -19,6 +19,8 @@
 // ──────────────────────────────────────────────────
 
 // ─── Load all modules ───────────────────────────────
+const aiProviders = require("./aiProviders");
+const aiSystemPrompt = require("./aiSystemPrompt");
 const env = require("./env");
 const branding = require("./branding");
 const constants = require("./constants");
