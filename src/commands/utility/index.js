@@ -1,8 +1,3 @@
-// ──────────────────────────────────────────────────
-//  BIGSTACK — Utility Commands Index
-//  © BIGSTACK by bigmanjtech™ with ♥︎
-// ──────────────────────────────────────────────────
-
 module.exports = {
     start: require("./start"),
     menu: require("./menu"),
@@ -14,5 +9,6 @@ module.exports = {
     profile: require("./profile"),
     store: require("./store"),
     settings: require("./settings"),
+    verify: require("./verify"),
     ai: require("./ai")
 };
