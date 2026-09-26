@@ -8,7 +8,7 @@ const config = require("../../config");
 const logger = require("../../core/logger");
 
 // ══════════════════════════════════════════════════
-//  Store layout ⏤ all under 1000 ⭐
+//  Store layout ⏤ all under 1000 Stars
 // ══════════════════════════════════════════════════
 const COIN_PACKAGES = [
     { id: "coins_100",  coins: 100,  stars: 30,   label: "100 Coins" },
@@ -85,7 +85,7 @@ function buildStoreKeyboard() {
 // ══════════════════════════════════════════════════
 module.exports = {
     name: "store",
-    aliases: ["shop", "buy", "premium"],
+    aliases: ["shop", "topup"],
     category: "utility",
     description: "Buy coins or premium",
     emoji: "◈",
@@ -118,30 +118,88 @@ module.exports = {
     //  Callbacks
     // ══════════════════════════════════════════════
     callbacks: [
+        // ─── User picked a package ────────────────
         {
             pattern: /^store:(coins|premium)_(.+)$/,
             handler: async (ctx) => {
                 const type = ctx.match[1];
                 const id = ctx.match[2];
+                const fullId = `${type}_${id}`;
 
-                await ctx.answerCallbackQuery({
-                    text: "⏳ Payment setup coming soon",
-                    show_alert: true
-                });
+                const starsService = require("../../services/payment/stars.service");
+                const pkg =
+                    starsService.COIN_PACKAGES[fullId] ||
+                    starsService.PREMIUM_PLANS[fullId];
 
-                await ctx.reply(
-                    `◈ *Payment Setup*\n\n` +
-                    `▸ Item    ➤ ${type === "coins" ? `${id} coins` : `${id} premium`}\n` +
-                    `▸ Status  ➤ Coming soon\n\n` +
-                    `▸ Contact @${config.owner?.username || "owner"} to buy now\n` +
-                    `▸ Or use /buy for manual payment`,
-                    { parse_mode: "Markdown" }
-                );
+                if (!pkg) {
+                    return ctx.answerCallbackQuery({
+                        text: "Unknown package",
+                        show_alert: true
+                    });
+                }
+
+                await ctx.answerCallbackQuery();
+
+                const lines = [
+                    `◈ *${pkg.label}*\n`,
+                    `▸ Price via Stars   ➤ ${pkg.stars} ⭐`
+                ];
+
+                if (pkg.coins) lines.push(`▸ Coins            ➤ ${pkg.coins}`);
+                if (pkg.days) lines.push(`▸ Duration         ➤ ${pkg.days} days`);
+
+                lines.push("");
+                lines.push(`▸ Choose payment method:`);
+
+                try {
+                    await ctx.editMessageText(lines.join("\n"), {
+                        parse_mode: "Markdown",
+                        reply_markup: {
+                            inline_keyboard: [
+                                [
+                                    {
+                                        text: `⭐ Pay with Stars (${pkg.stars})`,
+                                        callback_data: `store:stars:${fullId}`
+                                    }
+                                ],
+                                [
+                                    {
+                                        text: "◈ Mobile Money (Manual)",
+                                        callback_data: `buy:item:${fullId}`
+                                    }
+                                ],
+                                [
+                                    { text: "◀ Back", callback_data: "menu:store" }
+                                ]
+                            ]
+                        }
+                    });
+                } catch (err) {
+                    logger.warn(`[/store] edit failed: ${err.message}`);
+                }
+            }
+        },
+
+        // ─── User picked "Pay with Stars" ─────────
+        {
+            pattern: /^store:stars:(.+)$/,
+            handler: async (ctx) => {
+                const itemId = ctx.match[1];
+                const starsService = require("../../services/payment/stars.service");
+
+                await ctx.answerCallbackQuery();
+
+                try {
+                    await starsService.sendInvoice(ctx, itemId);
+                } catch (err) {
+                    logger.error(`[stars] invoice failed: ${err.message}`);
+                    await ctx.reply(`✗  Could not create invoice: ${err.message}`);
+                }
             }
         }
     ]
 };
 
-// ─── Export packages for use by /buy ────────────────
+// ─── Export packages ────────────────────────────────
 module.exports.COIN_PACKAGES = COIN_PACKAGES;
 module.exports.PREMIUM_PLANS = PREMIUM_PLANS;
