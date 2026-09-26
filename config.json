@@ -26,7 +26,7 @@
     },
 
     "webapp": {
-        "enabled": true,
+        "enabled": false,
         "title": "BIGSTACK",
         "shortName": "bigstack",
         "themeColor": "#0f0f0f",
@@ -35,32 +35,39 @@
     },
 
     "features": {
-        "player": true,
+        "player": false,
         "downloader": true,
         "search": true,
         "store": true,
         "coins": true,
         "premium": true,
-        "miniApp": true,
+        "miniApp": false,
         "forceJoin": true,
         "dailyReward": true,
         "referral": true,
-        "broadcast": true
+        "streak": true,
+        "quiz": true,
+        "ai": true,
+        "broadcast": true,
+        "payment": true
     },
 
     "forceJoin": {
         "enabled": true,
         "strict": true,
+        "cacheMinutes": 2,
         "telegram": [
             {
                 "name": "BIGSTACK Channel",
                 "id": "@bigst4ckhub",
-                "url": "https://t.me/bigst4ckhub"
+                "url": "https://t.me/bigst4ckhub",
+                "type": "channel"
             },
             {
                 "name": "BIGSTACK Support",
                 "id": "@bigst4ck_support",
-                "url": "https://t.me/bigst4ck_support"
+                "url": "https://t.me/bigst4ck_support",
+                "type": "group"
             }
         ],
         "whatsapp": [
@@ -75,9 +82,20 @@
     "rewards": {
         "daily": {
             "enabled": true,
-            "coins": 50,
-            "premiumCoins": 150,
+            "coins": 100,
+            "premiumCoins": 300,
             "cooldownHours": 24
+        },
+        "streak": {
+            "enabled": true,
+            "day1": 50,
+            "day2": 55,
+            "day3": 60,
+            "day4": 70,
+            "day5": 80,
+            "day6": 90,
+            "day7": 100,
+            "resetAfterMissedDays": 2
         },
         "referral": {
             "enabled": true,
@@ -86,7 +104,12 @@
         },
         "start": {
             "enabled": true,
-            "coins": 0
+            "coins": 20
+        },
+        "quiz": {
+            "enabled": true,
+            "coinsPerCorrect": 50,
+            "questionsPerDay": 1
         }
     },
 
@@ -94,30 +117,38 @@
         "currency": "Coins",
         "emoji": "🪙",
         "perCommand": {
-            "play": 10,
-            "ytmp3": 10,
-            "ytmp4": 15,
-            "spotifyplay": 10,
-            "spotify": 10,
-            "applemusic": 10,
-            "soundcloud": 5,
-            "instagram": 5,
-            "tiktok": 5,
-            "twitter": 5,
-            "facebook": 5,
-            "pinterest": 3,
-            "gdrive": 5,
-            "mediafire": 5,
-            "terabox": 5,
-            "github": 5,
-            "search": 2,
-            "song": 3,
-            "movie": 3,
-            "tv": 3,
-            "anime": 3,
-            "manga": 3,
-            "image": 2,
-            "lyrics": 2
+            "play": 5,
+            "ytmp3": 5,
+            "ytmp4": 10,
+            "spotifyplay": 5,
+            "spotify": 5,
+            "applemusic": 5,
+            "soundcloud": 3,
+            "instagram": 3,
+            "tiktok": 3,
+            "twitter": 3,
+            "facebook": 3,
+            "pinterest": 2,
+            "gdrive": 3,
+            "mediafire": 3,
+            "terabox": 3,
+            "github": 3,
+            "applesearch": 2,
+            "spotifysearch": 2,
+            "youtubesearch": 2,
+            "pinterestsearch": 2,
+            "imagesearch": 1,
+            "lyrics": 1,
+            "spotifylyric": 1,
+            "happymod": 2,
+            "whatmusic": 5,
+            "search": 1,
+            "song": 2,
+            "movie": 2,
+            "tv": 2,
+            "anime": 2,
+            "manga": 2,
+            "image": 1
         }
     },
 
@@ -134,7 +165,67 @@
             "noAds": true,
             "priorityQueue": true,
             "higherQuality": true,
-            "unlimitedDownloads": true
+            "unlimitedDownloads": true,
+            "unlimitedAI": true,
+            "noCoinCost": true
+        }
+    },
+
+    "ai": {
+        "enabled": true,
+        "freeTier": {
+            "dailyMessages": 15,
+            "imagesAllowed": false,
+            "voiceAllowed": false,
+            "memoryDepth": 20
+        },
+        "coinCosts": {
+            "textMessage": 1,
+            "imageGeneration": 5,
+            "voiceInput": 2,
+            "voiceOutput": 3
+        },
+        "premiumTier": {
+            "dailyMessages": -1,
+            "imagesAllowed": true,
+            "voiceAllowed": true,
+            "memoryDepth": -1
+        },
+        "memoryRetention": "forever",
+        "contextWindow": 20,
+        "preferredProvider": "auto",
+        "features": {
+            "chat": true,
+            "image": true,
+            "vision": true,
+            "voiceInput": true,
+            "voiceOutput": true,
+            "musicRecognition": true
+        }
+    },
+
+    "payments": {
+        "enabled": true,
+        "starsEnabled": true,
+        "manualEnabled": true,
+        "cryptoEnabled": false,
+        "mpesa": "+255 XXX XXX XXX",
+        "tigopesa": "+255 XXX XXX XXX",
+        "airtel": "+255 XXX XXX XXX",
+        "halopesa": "+255 XXX XXX XXX",
+        "usdtTrc20": "T...",
+        "usdtBep20": "0x...",
+        "tonWallet": "UQ...",
+        "packages": {
+            "coins_100":  { "coins": 100,  "stars": 30,   "tsh": "500 TSh",    "usd": "0.50" },
+            "coins_500":  { "coins": 500,  "stars": 140,  "tsh": "2,000 TSh",  "usd": "2.50" },
+            "coins_1000": { "coins": 1000, "stars": 260,  "tsh": "3,500 TSh",  "usd": "4.50" },
+            "coins_5000": { "coins": 5000, "stars": 1000, "tsh": "15,000 TSh", "usd": "20.00" }
+        },
+        "premiumPlans": {
+            "premium_weekly":  { "days": 7,   "stars": 150,  "tsh": "4,000 TSh",  "usd": "5.00" },
+            "premium_monthly": { "days": 30,  "stars": 450,  "tsh": "12,000 TSh", "usd": "15.00" },
+            "premium_yearly":  { "days": 365, "stars": 1000, "tsh": "40,000 TSh", "usd": "50.00" }
         }
     },
 
@@ -147,12 +238,25 @@
         "rateLimitPerMin": 10,
         "cacheTTLMin": 15,
         "maxSearchResults": 10,
-        "maxPlaylistSize": 50
+        "maxPlaylistSize": 50,
+        "maxAIMessageLength": 4000,
+        "maxBroadcastPerHour": 5
+    },
+
+    "rateLimit": {
+        "enabled": true,
+        "perUser": {
+            "commands": { "max": 15, "windowSec": 60 },
+            "downloads": { "max": 8, "windowSec": 60 },
+            "ai": { "max": 30, "windowSec": 60 }
+        },
+        "exemptCommands": ["start", "help", "menu", "daily", "balance", "profile"]
     },
 
     "queue": {
         "maxConcurrentDownloads": 3,
         "maxConcurrentApiCalls": 10,
+        "maxConcurrentAI": 5,
         "retryAttempts": 2,
         "retryDelayMs": 1000
     },
@@ -163,7 +267,10 @@
         "ttl": {
             "search": 600,
             "download": 1800,
-            "user": 300
+            "user": 300,
+            "aiMemory": 300,
+            "forceJoin": 120,
+            "rateLimit": 60
         }
     },
 
@@ -180,7 +287,10 @@
             "forceJoin": "force_join",
             "sessions": "sessions",
             "logs": "logs",
-            "commandStats": "command_stats"
+            "commandStats": "command_stats",
+            "aiMemories": "ai_memories",
+            "transactions": "transactions",
+            "payments": "payments"
         }
     },
 
@@ -208,7 +318,9 @@
                 "name": "BIGSTACK ACTIVITY",
                 "sendNewUsers": true,
                 "sendDownloads": true,
-                "sendCommands": false
+                "sendCommands": false,
+                "sendPayments": true,
+                "sendReferrals": true
             },
             "stats": {
                 "id": "-1004473516878",
@@ -216,31 +328,33 @@
                 "interval": "hourly",
                 "sendTopCommands": true,
                 "sendUserCount": true,
-                "sendErrorCount": true
+                "sendErrorCount": true,
+                "sendRevenue": true
             }
         }
     },
 
     "messages": {
         "footer": "© BIGSTACK by bigmanjtech™ with ♥︎",
-        "welcome": "🇼‌🇪‌🇱‌🇨‌🇴‌🇲‌🇪 𝐭𝐨 𝐁𝐈𝐆𝐒𝐓4𝐂𝐊 !\nYour all-in-one media downloader.",
-        "loading": "🇵‌🇱‌🇪‌🇦‌🇸‌🇪‌ 🇼‌🇦‌🇮‌🇹‌...",
-        "notFound": "nothing found!",
-        "error": "Something went wrong. Try again later.",
-        "rateLimited": "Too many requests. Please wait a minute.",
-        "noCoins": "🪙 You don't have enough coins.",
-        "forceJoinRequired": "You must join our channels to use BIGSTACK.",
-        "premiumOnly": "This command is for Premium users only.",
-        "adminOnly": "This command is for admins only.",
-        "ownerOnly": "This command is for the owner only."
+        "welcome": "◈ Welcome to BIGSTACK\nYour all-in-one media assistant.",
+        "loading": "◐ Please wait...",
+        "notFound": "✗  Nothing found",
+        "error": "✗  Something went wrong. Try again later.",
+        "rateLimited": "◐ Too many requests. Please wait a minute.",
+        "noCoins": "✗  You don't have enough coins.",
+        "forceJoinRequired": "◐ You must join our channels to use BIGSTACK.",
+        "premiumOnly": "★ This command is for Premium users only.",
+        "adminOnly": "◈ This command is for admins only.",
+        "ownerOnly": "◈ This command is for the owner only."
     },
 
     "links": {
-        "support": "https://t.me/bigst4ckhub",
+        "support": "https://t.me/bigst4ck_support",
         "channel": "https://t.me/bigst4ckhub",
         "repo": "https://github.com/bigtech2/BIGSTACk",
         "docs": "https://docs.bigstack.dev",
-        "website": "https://bigstack.dev"
+        "website": "https://bigstack.dev",
+        "whatsapp": "https://whatsapp.com/channel/0029Vb8VpyiK0IBkFiIslc0Y"
     },
 
     "locales": {
