@@ -6,5 +6,6 @@ module.exports = {
     spotifylyric: require("./spotifylyric"),
     spotifysearch: require("./spotifysearch"),
     pinterestsearch: require("./pinterestsearch"),
-    youtubesearch: require("./youtubesearch")
+    youtubesearch: require("./youtubesearch"),
+    whatmusic: require("./whatmusic")
 };
