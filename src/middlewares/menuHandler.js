@@ -82,6 +82,14 @@ const CATEGORIES = {
             ["streak", "View streak"]
         ]
     },
+    store: {
+        title: "★ STORE",
+        desc: "Buy coins or unlock premium.",
+        commands: [
+            ["store", "Open the store"],
+            ["buy",   "Manual payment info"]
+        ]
+    },
     settings: {
         title: "⚙ SETTINGS",
         desc: "Configure your bot experience.",
@@ -161,7 +169,10 @@ function homeKeyboard() {
                 { text: "☆ Daily Coins", callback_data: "menu:daily" }
             ],
             [
-                { text: "⚙ Settings", callback_data: "menu:settings" },
+                { text: "★ Store", callback_data: "menu:store" },
+                { text: "⚙ Settings", callback_data: "menu:settings" }
+            ],
+            [
                 { text: "? Help", callback_data: "menu:help" }
             ]
         ]
@@ -193,6 +204,31 @@ async function menuHandler(ctx, next) {
                 parse_mode: "Markdown",
                 reply_markup: homeKeyboard()
             });
+        }
+        return;
+    }
+
+    // ─── Store shortcut ──────────────────────────
+    if (key === "store") {
+        await ctx.answerCallbackQuery();
+        try {
+            await ctx.editMessageText(
+                `◈ *STORE*\n\n` +
+                `▸ Use /store to open the coin shop.\n` +
+                `▸ Or /buy for mobile money payments.`,
+                {
+                    parse_mode: "Markdown",
+                    reply_markup: {
+                        inline_keyboard: [
+                            [{ text: "★ Open Store", callback_data: "menu:store" }],
+                            [{ text: "◈ Buy with Mobile Money", url: "https://t.me" }],
+                            [{ text: "◀ Back", callback_data: "menu:home" }]
+                        ]
+                    }
+                }
+            );
+        } catch {
+            await ctx.reply("◈ Use /store to open the shop.", { parse_mode: "Markdown" });
         }
         return;
     }
