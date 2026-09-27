@@ -1,0 +1,66 @@
+{
+    "welcome": "◈ Welcome to BIGSTACK\n\nHello, {name}!\n\nI am your all-in-one media assistant.\n\n▸ Download from 16 platforms\n▸ Search music, movies, images\n▸ AI assistant with chat + vision\n▸ Earn coins daily, unlock premium\n\n▸ Choose an option below to begin",
+
+    "loading": "◐ Please wait...",
+    "thinking": "◐ Thinking...",
+    "processing": "◐ Processing...",
+    "searching": "◐ Searching...",
+    "downloading": "◐ Downloading...",
+    "uploading": "◐ Uploading...",
+
+    "notFound": "✗ Nothing found",
+    "error": "✗ Something went wrong. Try again later.",
+    "invalidInput": "✗ Invalid input",
+    "invalidUrl": "✗ Invalid URL",
+    "invalidPhone": "✗ Invalid phone number",
+
+    "success": "✓ Success",
+    "completed": "✓ Completed",
+    "sent": "✓ Sent",
+    "received": "✓ Received",
+
+    "rateLimited": "◐ Too many requests. Please wait a minute.",
+    "noCoins": "✗ You don't have enough coins.",
+    "notEnoughCoins": "✗ Not enough coins\n\n▸ Required ➤ {required}\n▸ Balance ➤ {balance}\n▸ Short by ➤ {short}\n\n▸ Get coins:\n   /daily ⏤ free\n   /refer ⏤ invite\n   /store ⏤ buy",
+
+    "forceJoinRequired": "◐ You must join our channels to use BIGSTACK.",
+    "premiumOnly": "★ This command is for Premium users only.",
+    "adminOnly": "◈ This command is for admins only.",
+    "ownerOnly": "◈ This command is for the owner only.",
+    "privateOnly": "◐ Use this command in private chat.",
+
+    "daily": {
+        "claimed": "◈ DAILY REWARD CLAIMED\n\n▸ Reward ➤ +{coins} 🪙\n▸ Balance ➤ {balance} 🪙\n▸ Streak ➤ {streak} days\n\n▸ Next claim in 24 hours",
+        "alreadyClaimed": "◐ Already Claimed\n\n▸ Come back in {time}",
+        "disabled": "◐ Daily rewards are disabled."
+    },
+
+    "balance": {
+        "title": "◈ YOUR WALLET",
+        "coins": "▸ Coins ➤ {coins} 🪙",
+        "earned": "▸ Earned ➤ {earned}",
+        "spent": "▸ Spent ➤ {spent}"
+    },
+
+    "refer": {
+        "title": "◈ INVITE FRIENDS",
+        "stats": "▸ Invited ➤ {count}\n▸ Earned ➤ {earned} 🪙",
+        "link": "▸ Your link:\n{link}"
+    },
+
+    "ai": {
+        "on": "◉ AI ACTIVE",
+        "off": "○ AI INACTIVE",
+        "activated": "◉ AI activated",
+        "disabled": "○ AI disabled",
+        "freeMessages": "▸ Free ➤ {remaining} / {limit} today",
+        "limitReached": "◐ Daily limit reached\n\n▸ /store to buy coins"
+    },
+
+    "payment": {
+        "success": "✓ Payment Received",
+        "failed": "✗ Payment Failed",
+        "pending": "◐ Pending approval",
+        "cancelled": "✓ Payment cancelled"
+    }
+}
