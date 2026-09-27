@@ -4,9 +4,9 @@
         "tagline": "Media Downloader & Search Bot",
         "footer": "© BIGSTACK by bigmanjtech™ with ♥︎",
         "version": "1.0.0",
-        "logo": "src/assets/images/bigstack-logo.png",
-        "banner": "src/assets/images/bigstack-banner.png",
-        "thumbnail": "src/assets/images/bigstack-logo.png"
+        "logo": "https://files.catbox.moe/dxy1zr.png",
+        "banner": "https://files.catbox.moe/dxy1zr.png",
+        "thumbnail": "https://files.catbox.moe/dxy1zr.png"
     },
 
     "owner": {
@@ -22,7 +22,7 @@
         "defaultLanguage": "en",
         "theme": "dark",
         "timezone": "Africa/Dar_es_Salaam",
-        "thumbnail": "src/assets/images/bigstack-logo.png"
+        "thumbnail": "https://files.catbox.moe/dxy1zr.png"
     },
 
     "webapp": {
