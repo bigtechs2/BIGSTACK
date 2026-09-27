@@ -7,16 +7,17 @@ const logger = require("../../core/logger");
 
 // ─── Prices in Stars ────────────────────────────────
 const COIN_PACKAGES = {
-    coins_100:  { coins: 100,  stars: 30,   label: "100 Coins" },
-    coins_500:  { coins: 500,  stars: 140,  label: "500 Coins" },
-    coins_1000: { coins: 1000, stars: 260,  label: "1000 Coins" },
-    coins_5000: { coins: 5000, stars: 1000, label: "5000 Coins" }
+    coins_100:  { coins: 100,  stars: 15,  label: "100 Coins" },
+    coins_220:  { coins: 220,  stars: 30,  label: "220 Coins" },
+    coins_350:  { coins: 350,  stars: 45,  label: "350 Coins" },
+    coins_600:  { coins: 600,  stars: 70,  label: "600 Coins" },
+    coins_1000: { coins: 1000, stars: 100, label: "1000 Coins" }
 };
 
 const PREMIUM_PLANS = {
-    premium_weekly:  { days: 7,   stars: 150,  label: "Weekly Premium" },
-    premium_monthly: { days: 30,  stars: 450,  label: "Monthly Premium" },
-    premium_yearly:  { days: 365, stars: 1000, label: "Yearly Premium" }
+    premium_weekly:  { days: 7,   stars: 15,  label: "Weekly Premium" },
+    premium_monthly: { days: 30,  stars: 45,  label: "Monthly Premium" },
+    premium_yearly:  { days: 365, stars: 100, label: "Yearly Premium" }
 };
 
 // ══════════════════════════════════════════════════
@@ -43,9 +44,9 @@ async function sendInvoice(ctx, itemId) {
     await ctx.replyWithInvoice(
         title,
         description,
-        `bigstack_${itemId}_${Date.now()}`,  // payload
-        "XTR",                                // currency = Telegram Stars
-        [{ label: title, amount: item.stars }],  // prices
+        `bigstack_${itemId}_${Date.now()}`,       // payload
+        "XTR",                                     // currency = Telegram Stars
+        [{ label: title, amount: item.stars }],    // prices
         {
             // Optional: photo URL
             // provider_token: ""  (empty for Stars)
