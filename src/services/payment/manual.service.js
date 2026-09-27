@@ -23,14 +23,15 @@ const METHODS = {
 
 // ─── Price list ─────────────────────────────────────
 const PRICES = {
-    coins_100:  { label: "100 Coins",   coins: 100,  tsh: "500 TSh",     usd: "0.50 USDT" },
-    coins_500:  { label: "500 Coins",   coins: 500,  tsh: "2,000 TSh",   usd: "2.50 USDT" },
-    coins_1000: { label: "1000 Coins",  coins: 1000, tsh: "3,500 TSh",   usd: "4.50 USDT" },
-    coins_5000: { label: "5000 Coins",  coins: 5000, tsh: "15,000 TSh",  usd: "20.00 USDT" },
+    coins_100:  { label: "100 Coins",  coins: 100,  tsh: "500 TSh" },
+    coins_220:  { label: "220 Coins",  coins: 220,  tsh: "1,000 TSh" },
+    coins_350:  { label: "350 Coins",  coins: 350,  tsh: "1,500 TSh" },
+    coins_600:  { label: "600 Coins",  coins: 600,  tsh: "2,500 TSh" },
+    coins_1000: { label: "1000 Coins", coins: 1000, tsh: "3,500 TSh" },
 
-    premium_weekly:  { label: "Weekly Premium",  days: 7,   tsh: "4,000 TSh",   usd: "5.00 USDT" },
-    premium_monthly: { label: "Monthly Premium", days: 30,  tsh: "12,000 TSh",  usd: "15.00 USDT" },
-    premium_yearly:  { label: "Yearly Premium",  days: 365, tsh: "40,000 TSh",  usd: "50.00 USDT" }
+    premium_weekly:  { label: "Weekly Premium",  days: 7,   tsh: "500 TSh" },
+    premium_monthly: { label: "Monthly Premium", days: 30,  tsh: "1,500 TSh" },
+    premium_yearly:  { label: "Yearly Premium",  days: 365, tsh: "3,500 TSh" }
 };
 
 // ══════════════════════════════════════════════════
