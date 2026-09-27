@@ -18,13 +18,14 @@ function buildItemScreen() {
         `▸ Choose what to buy:\n\n` +
         `◈ *Coins*\n` +
         `   ➤ 100 Coins   ➤ 500 TSh\n` +
-        `   ➤ 500 Coins   ➤ 2,000 TSh\n` +
-        `   ➤ 1000 Coins  ➤ 3,500 TSh\n` +
-        `   ➤ 5000 Coins  ➤ 15,000 TSh\n\n` +
+        `   ➤ 220 Coins   ➤ 1,000 TSh\n` +
+        `   ➤ 350 Coins   ➤ 1,500 TSh\n` +
+        `   ➤ 600 Coins   ➤ 2,500 TSh\n` +
+        `   ➤ 1000 Coins  ➤ 3,500 TSh\n\n` +
         `★ *Premium*\n` +
-        `   ➤ Weekly      ➤ 4,000 TSh\n` +
-        `   ➤ Monthly     ➤ 12,000 TSh\n` +
-        `   ➤ Yearly      ➤ 40,000 TSh\n\n` +
+        `   ➤ Weekly      ➤ 500 TSh\n` +
+        `   ➤ Monthly     ➤ 1,500 TSh\n` +
+        `   ➤ Yearly      ➤ 3,500 TSh\n\n` +
         `▸ ${config.footer}`
     );
 }
@@ -34,20 +35,23 @@ function buildItemKeyboard() {
         inline_keyboard: [
             [
                 { text: "100 Coins · 500 TSh", callback_data: "buy:item:coins_100" },
-                { text: "500 Coins · 2K TSh", callback_data: "buy:item:coins_500" }
+                { text: "220 Coins · 1K TSh", callback_data: "buy:item:coins_220" }
             ],
             [
-                { text: "1000 Coins · 3.5K TSh", callback_data: "buy:item:coins_1000" },
-                { text: "5000 Coins · 15K TSh", callback_data: "buy:item:coins_5000" }
+                { text: "350 Coins · 1.5K TSh", callback_data: "buy:item:coins_350" },
+                { text: "600 Coins · 2.5K TSh", callback_data: "buy:item:coins_600" }
             ],
             [
-                { text: "★ Weekly · 4K TSh", callback_data: "buy:item:premium_weekly" }
+                { text: "1000 Coins · 3.5K TSh", callback_data: "buy:item:coins_1000" }
             ],
             [
-                { text: "★ Monthly · 12K TSh", callback_data: "buy:item:premium_monthly" }
+                { text: "★ Weekly · 500 TSh", callback_data: "buy:item:premium_weekly" }
             ],
             [
-                { text: "★ Yearly · 40K TSh", callback_data: "buy:item:premium_yearly" }
+                { text: "★ Monthly · 1.5K TSh", callback_data: "buy:item:premium_monthly" }
+            ],
+            [
+                { text: "★ Yearly · 3.5K TSh", callback_data: "buy:item:premium_yearly" }
             ],
             [
                 { text: "◀ Back", callback_data: "menu:home" }
