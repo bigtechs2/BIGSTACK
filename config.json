@@ -10,8 +10,8 @@
     },
 
     "owner": {
-        "username": "bigmanjtech",
-        "name": "bigmank",
+        "username": "@bigmanj09",
+        "name": "bigmanj",
         "contact": "https://t.me/bigmanj09",
         "channel": "https://t.me/bigst4ckhub"
     },
@@ -32,6 +32,12 @@
         "themeColor": "#0f0f0f",
         "backgroundColor": "#ffffff",
         "path": "/webapp"
+    },
+
+    "api": {
+        "enabled": true,
+        "port": 3000,
+        "baseUrl": "https://your-bot-url.com"
     },
 
     "features": {
@@ -66,7 +72,7 @@
             {
                 "name": "BIGSTACK Support",
                 "id": "@bigst4ck_support",
-                "url": "https://t.me/bigst4ck_support",
+                "url": "https://t.me/bigst4cksupport",
                 "type": "group"
             }
         ],
@@ -209,24 +215,37 @@
         "starsEnabled": true,
         "manualEnabled": true,
         "cryptoEnabled": false,
-        "mpesa": "+255 XXX XXX XXX",
-        "tigopesa": "+255 XXX XXX XXX",
-        "airtel": "+255 XXX XXX XXX",
-        "halopesa": "+255 XXX XXX XXX",
+        "minTsh": 500,
+        "maxTsh": 3500,
+        "maxStarsPerTransaction": 100,
+        "mpesa": "+255636756591",
+        "tigopesa": "+255636756591",
+        "airtel": "+255636756591",
+        "halopesa": "+255636756591",
         "usdtTrc20": "T...",
         "usdtBep20": "0x...",
         "tonWallet": "UQ...",
         "packages": {
-            "coins_100":  { "coins": 100,  "stars": 30,   "tsh": "500 TSh",    "usd": "0.50" },
-            "coins_500":  { "coins": 500,  "stars": 140,  "tsh": "2,000 TSh",  "usd": "2.50" },
-            "coins_1000": { "coins": 1000, "stars": 260,  "tsh": "3,500 TSh",  "usd": "4.50" },
-            "coins_5000": { "coins": 5000, "stars": 1000, "tsh": "15,000 TSh", "usd": "20.00" }
+            "coins_100":  { "coins": 100,  "stars": 15,  "tsh": "500 TSh" },
+            "coins_220":  { "coins": 220,  "stars": 30,  "tsh": "1,000 TSh" },
+            "coins_350":  { "coins": 350,  "stars": 45,  "tsh": "1,500 TSh" },
+            "coins_600":  { "coins": 600,  "stars": 70,  "tsh": "2,500 TSh" },
+            "coins_1000": { "coins": 1000, "stars": 100, "tsh": "3,500 TSh" }
         },
         "premiumPlans": {
-            "premium_weekly":  { "days": 7,   "stars": 150,  "tsh": "4,000 TSh",  "usd": "5.00" },
-            "premium_monthly": { "days": 30,  "stars": 450,  "tsh": "12,000 TSh", "usd": "15.00" },
-            "premium_yearly":  { "days": 365, "stars": 1000, "tsh": "40,000 TSh", "usd": "50.00" }
+            "premium_weekly":  { "days": 7,   "stars": 15,  "tsh": "500 TSh" },
+            "premium_monthly": { "days": 30,  "stars": 45,  "tsh": "1,500 TSh" },
+            "premium_yearly":  { "days": 365, "stars": 100, "tsh": "3,500 TSh" }
         }
+    },
+
+    "sonicpesa": {
+        "enabled": true,
+        "env": "production",
+        "apiUrl": "https://api.sonicpesa.com/api/v1/payment/create_order",
+        "currency": "TZS",
+        "timeoutMs": 45000,
+        "webhookPath": "/api/payment/webhook"
     },
 
     "limits": {
@@ -349,7 +368,7 @@
     },
 
     "links": {
-        "support": "https://t.me/bigst4ck_support",
+        "support": "https://t.me/bigst4cksupport",
         "channel": "https://t.me/bigst4ckhub",
         "repo": "https://github.com/bigtech2/BIGSTACk",
         "docs": "https://docs.bigstack.dev",
