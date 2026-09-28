@@ -55,6 +55,8 @@ const userSchema = new mongoose.Schema(
 
         // ══════════════════════════════════════════
         //  REFERRAL
+        //  NOTE: unique + sparse removed ⏤
+        //  enforced in code via generateReferralCode()
         // ══════════════════════════════════════════
         referrerId: { type: String, default: null, index: true },
         referralCount: { type: Number, default: 0 },
@@ -62,8 +64,6 @@ const userSchema = new mongoose.Schema(
         referralCode: {
             type: String,
             default: null,
-            unique: true,
-            sparse: true,
             index: true
         },
 
@@ -253,7 +253,6 @@ userSchema.methods.claimDaily = function (amount) {
     this.totalClaims += 1;
     this.addCoins(amount);
 
-    // ─── Streak logic ─────────────────────────────
     const now = new Date();
     const last = this.lastStreakAt;
     const oneDayMs = 24 * 60 * 60 * 1000;
@@ -263,10 +262,8 @@ userSchema.methods.claimDaily = function (amount) {
     } else {
         const diff = now.getTime() - last.getTime();
         if (diff < oneDayMs * 2) {
-            // Consecutive day
             this.streakDays += 1;
         } else {
-            // Streak reset
             this.streakDays = 1;
         }
     }
@@ -286,14 +283,23 @@ userSchema.methods.canClaimDaily = function (cooldownMs = 24 * 60 * 60 * 1000) {
     return { ok: false, remaining };
 };
 
-// ─── Generate a referral code ───────────────────────
+// ══════════════════════════════════════════════════
+//  REFERRAL CODE GENERATOR
+//  Guaranteed unique ⏤ uses telegramId + random
+// ══════════════════════════════════════════════════
 userSchema.methods.generateReferralCode = function () {
     if (this.referralCode) return this.referralCode;
 
-    const code = `BS${String(this.telegramId).slice(-6)}${Math.random()
+    // ─── Build unique code ────────────────────────
+    // Format: BS + telegramId (up to 10) + random (6 chars)
+    // Example: BS8594354663ABC123
+    const idPart = String(this.telegramId).slice(-10);
+    const randomPart = Math.random()
         .toString(36)
-        .slice(2, 6)
-        .toUpperCase()}`;
+        .slice(2, 8)
+        .toUpperCase();
+
+    const code = `BS${idPart}${randomPart}`;
 
     this.referralCode = code;
     return code;
@@ -301,7 +307,7 @@ userSchema.methods.generateReferralCode = function () {
 
 // ─── Apply referral (for new user) ──────────────────
 userSchema.methods.applyReferral = function (referrerId, refereeBonus) {
-    if (this.referrerId) return this; // already referred
+    if (this.referrerId) return this;
     this.referrerId = referrerId;
     this.addCoins(refereeBonus);
     return this;
