@@ -79,20 +79,20 @@ async function start() {
         // ─── 6. Load commands ───────────────────────
         await loadCommands(bot);
 
-        // ─── 7. Start API server (for webhooks) ─────
-        if (config.sonicpesa?.enabled || config.payments?.enabled) {
-            try {
-                const { startAPI } = require("../api/server");
-                const apiPort = Number(process.env.API_PORT) || 3000;
-                global.__apiServer = await startAPI(apiPort);
-                logger.info(`✓ API webhook server started on port ${apiPort}`);
-            } catch (err) {
-                logger.warn(`⚠  API server failed: ${err.message}`);
-                logger.warn("   Payments via webhook will not work");
-            }
-        } else {
-            logger.info("⏤ API server disabled in config");
-        }
+
+// ─── 7. Start API server ────────────────────
+if (config.api?.enabled !== false) {
+    try {
+        const { startAPI } = require("../api/server");
+        const apiPort = Number(process.env.API_PORT) || config.api?.port || 3000;
+        global.__apiServer = await startAPI(apiPort);
+        logger.info(`✓ API server started on port ${apiPort}`);
+    } catch (err) {
+        logger.warn(`⚠  API server failed: ${err.message}`);
+    }
+} else {
+    logger.info("⏤ API server disabled in config");
+}
 
         // ─── 8. Start the scheduler ─────────────────
         scheduler.start();
