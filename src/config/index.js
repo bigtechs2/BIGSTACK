@@ -32,6 +32,9 @@ const permissions = require("./permissions");
 const forceJoin = require("./forceJoin");
 const reward = require("./reward");
 const webApp = require("./webApp");
+const sonicpesa = require("./sonicpesa");
+const payments = require("./payments");
+const api = require("./api");
 
 // ─── Master config ──────────────────────────────────
 const config = {
