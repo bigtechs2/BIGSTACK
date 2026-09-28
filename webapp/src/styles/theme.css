@@ -1,0 +1,75 @@
+/* ══════════════════════════════════════════════════
+   BIGSTACK — Theme Variables
+   © BIGSTACK by bigmanjtech™ with ♥︎
+   ══════════════════════════════════════════════════ */
+
+:root {
+    /* ─── Core Colors ─── */
+    --bg-primary: #0f0f0f;
+    --bg-secondary: #1a1a1a;
+    --bg-tertiary: #222222;
+    --bg-card: #1c1c1c;
+    --bg-hover: #2a2a2a;
+
+    /* ─── Text ─── */
+    --text-primary: #f5f5f5;
+    --text-secondary: #b8b8b8;
+    --text-muted: #777777;
+
+    /* ─── Accent ─── */
+    --accent: #a855f7;
+    --accent-light: #c084fc;
+    --accent-dark: #7e22ce;
+    --accent-glow: rgba(168, 85, 247, 0.3);
+
+    --accent-cyan: #00e5ff;
+    --accent-gold: #ffd700;
+    --accent-green: #22c55e;
+    --accent-red: #ef4444;
+
+    /* ─── Borders ─── */
+    --border-color: #2a2a2a;
+    --border-hover: #3a3a3a;
+
+    /* ─── Shadows ─── */
+    --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.4);
+    --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.5);
+    --shadow-lg: 0 8px 32px rgba(0, 0, 0, 0.6);
+    --shadow-glow: 0 0 20px var(--accent-glow);
+
+    /* ─── Radius ─── */
+    --radius-sm: 8px;
+    --radius-md: 12px;
+    --radius-lg: 16px;
+    --radius-xl: 24px;
+    --radius-full: 999px;
+
+    /* ─── Spacing ─── */
+    --space-xs: 4px;
+    --space-sm: 8px;
+    --space-md: 12px;
+    --space-lg: 16px;
+    --space-xl: 24px;
+
+    /* ─── Dynamic accent (changes per platform) ─── */
+    --platform-color: var(--accent);
+
+    /* ─── Layout ─── */
+    --nav-height: 64px;
+    --header-height: 56px;
+}
+
+/* ─── Dynamic theme per platform ─── */
+.theme-youtube    { --platform-color: #ff0000; }
+.theme-spotify    { --platform-color: #1db954; }
+.theme-applemusic { --platform-color: #fa243c; }
+.theme-soundcloud { --platform-color: #ff5500; }
+.theme-instagram  { --platform-color: #e1306c; }
+.theme-tiktok     { --platform-color: #25f4ee; }
+.theme-facebook   { --platform-color: #1877f2; }
+.theme-twitter    { --platform-color: #1da1f2; }
+.theme-pinterest  { --platform-color: #e60023; }
+.theme-gdrive     { --platform-color: #4285f4; }
+.theme-github     { --platform-color: #8b5cf6; }
+.theme-terabox    { --platform-color: #0076ff; }
+.theme-mediafire  { --platform-color: #1299f3; }
