@@ -11,14 +11,10 @@ const cache = require("../core/cache");
 // ─── Cache TTL for join checks (2 min) ──────────────
 const CACHE_TTL = 120;
 
-// ─── Commands always allowed (bypass force-join) ────
+// ─── Only /verify bypasses force-join ───────────────
+// IMPORTANT: Do NOT add "start" — /start must trigger the join prompt
 const ALLOWED_COMMANDS = [
-    "start",
-    "help",
-    "menu",
-    "verify",
-    "about",
-    "lang"
+    "verify"
 ];
 
 // ══════════════════════════════════════════════════
@@ -109,7 +105,7 @@ async function forceJoin(ctx, next) {
     // ─── Skip if owner ───────────────────────────────
     if (config.isOwner(ctx.from.id)) return next();
 
-    // ─── Skip allowed commands ───────────────────────
+    // ─── Skip if /verify or verify callback ─────────
     if (ctx.commandName && ALLOWED_COMMANDS.includes(ctx.commandName)) {
         return next();
     }
