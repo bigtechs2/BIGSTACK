@@ -1,6 +1,6 @@
 // ──────────────────────────────────────────────────
 //  BIGSTACK — Menu Handler Middleware
-//  Handles all menu:* callback buttons
+//  Handles menu:* buttons ⏤ uses URL banner
 //  © BIGSTACK by bigmanjtech™ with ♥︎
 // ──────────────────────────────────────────────────
 
@@ -8,7 +8,7 @@ const logger = require("../core/logger");
 const config = require("../config");
 
 // ══════════════════════════════════════════════════
-//  Category definitions
+//  Categories
 // ══════════════════════════════════════════════════
 const CATEGORIES = {
     downloader: {
@@ -52,7 +52,8 @@ const CATEGORIES = {
         title: "◉ AI ASSISTANT",
         desc: "Chat, ask questions, generate images, transcribe voice.",
         commands: [
-            ["ai", "Open AI control center"]
+            ["ai",      "Open AI control center"],
+            ["aivoice", "Toggle voice replies"]
         ]
     },
     player: {
@@ -70,7 +71,8 @@ const CATEGORIES = {
         commands: [
             ["profile", "Your stats"],
             ["balance", "Coin balance"],
-            ["refer",   "Invite link"]
+            ["refer",   "Invite link"],
+            ["id",      "Your Telegram ID"]
         ]
     },
     daily: {
@@ -102,14 +104,29 @@ const CATEGORIES = {
         title: "? HELP",
         desc: "Get help using the bot.",
         commands: [
-            ["help",  "Command list"],
-            ["about", "About BIGSTACK"]
+            ["help",   "Command list"],
+            ["about",  "About BIGSTACK"],
+            ["ping",   "Check latency"],
+            ["alive",  "Bot status"],
+            ["report", "Report a bug"]
         ]
     }
 };
 
 // ══════════════════════════════════════════════════
-//  Build the category screen
+//  Get banner URL
+// ══════════════════════════════════════════════════
+function getBannerUrl() {
+    return (
+        config.branding?.bannerUrl ||
+        config.branding?.banner ||
+        config.branding?.logo ||
+        null
+    );
+}
+
+// ══════════════════════════════════════════════════
+//  Category screen
 // ══════════════════════════════════════════════════
 function buildCategoryScreen(key) {
     const cat = CATEGORIES[key];
@@ -146,10 +163,17 @@ function backKeyboard() {
 // ══════════════════════════════════════════════════
 //  Home screen
 // ══════════════════════════════════════════════════
-function buildHomeScreen() {
+function buildHomeCaption() {
     return (
         `◈ *BIGSTACK MENU*\n\n` +
-        `▸ Pick a category below`
+        `▸ Your all-in-one media assistant.\n\n` +
+        `▸ Choose a category below:\n` +
+        `   ◇ Downloader\n` +
+        `   ◈ Search\n` +
+        `   ◉ AI Assistant\n` +
+        `   ★ Profile\n` +
+        `   ☆ Daily Coins\n\n` +
+        `▸ ${config.footer}`
     );
 }
 
@@ -180,10 +204,65 @@ function homeKeyboard() {
 }
 
 // ══════════════════════════════════════════════════
+//  Send home (with URL banner)
+// ══════════════════════════════════════════════════
+async function sendHome(ctx, isEdit = false) {
+    const bannerUrl = getBannerUrl();
+    const hasUrl = bannerUrl && /^https?:\/\//i.test(bannerUrl);
+
+    // ─── With URL image ⏤ EDIT mode ─────────────────
+    if (hasUrl && isEdit) {
+        try {
+            await ctx.editMessageMedia(
+                {
+                    type: "photo",
+                    media: bannerUrl,
+                    caption: buildHomeCaption(),
+                    parse_mode: "Markdown"
+                },
+                { reply_markup: homeKeyboard() }
+            );
+            return;
+        } catch (err) {
+            logger.warn(`[menuHandler] edit photo failed: ${err.message}`);
+        }
+    }
+
+    // ─── With URL image ⏤ SEND mode ─────────────────
+    if (hasUrl && !isEdit) {
+        try {
+            await ctx.replyWithPhoto(bannerUrl, {
+                caption: buildHomeCaption(),
+                parse_mode: "Markdown",
+                reply_markup: homeKeyboard()
+            });
+            return;
+        } catch (err) {
+            logger.warn(`[menuHandler] send photo failed: ${err.message}`);
+        }
+    }
+
+    // ─── Fallback ⏤ text only ───────────────────────
+    if (isEdit) {
+        try {
+            await ctx.editMessageText(buildHomeCaption(), {
+                parse_mode: "Markdown",
+                reply_markup: homeKeyboard()
+            });
+            return;
+        } catch { /* ignore */ }
+    }
+
+    await ctx.reply(buildHomeCaption(), {
+        parse_mode: "Markdown",
+        reply_markup: homeKeyboard()
+    });
+}
+
+// ══════════════════════════════════════════════════
 //  Main middleware
 // ══════════════════════════════════════════════════
 async function menuHandler(ctx, next) {
-    // Only handle callback queries
     if (!ctx.callbackQuery) return next();
 
     const data = ctx.callbackQuery.data;
@@ -194,17 +273,7 @@ async function menuHandler(ctx, next) {
     // ─── Home ────────────────────────────────────
     if (key === "home") {
         await ctx.answerCallbackQuery();
-        try {
-            await ctx.editMessageText(buildHomeScreen(), {
-                parse_mode: "Markdown",
-                reply_markup: homeKeyboard()
-            });
-        } catch {
-            await ctx.reply(buildHomeScreen(), {
-                parse_mode: "Markdown",
-                reply_markup: homeKeyboard()
-            });
-        }
+        await sendHome(ctx, true);
         return;
     }
 
@@ -215,13 +284,12 @@ async function menuHandler(ctx, next) {
             await ctx.editMessageText(
                 `◈ *STORE*\n\n` +
                 `▸ Use /store to open the coin shop.\n` +
-                `▸ Or /buy for mobile money payments.`,
+                `▸ Or /buy for mobile money payments.\n\n` +
+                `▸ ${config.footer}`,
                 {
                     parse_mode: "Markdown",
                     reply_markup: {
                         inline_keyboard: [
-                            [{ text: "★ Open Store", callback_data: "menu:store" }],
-                            [{ text: "◈ Buy with Mobile Money", url: "https://t.me" }],
                             [{ text: "◀ Back", callback_data: "menu:home" }]
                         ]
                     }
