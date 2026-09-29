@@ -1,30 +1,53 @@
 // ──────────────────────────────────────────────────
-//  BIGSTACK — Downloader Services Index
+//  BIGSTACK — Downloader Commands Index
 //  © BIGSTACK by bigmanjtech™ with ♥︎
+//
+//  This file lists all downloader commands.
+//  The loader reads this to know what to register.
+//  ⚠️ Not used as a middleware — just a manifest.
 // ──────────────────────────────────────────────────
 
 module.exports = {
-    // ─── Music ──────────────────────────────────────
-    play:        require("./play.service"),
-    ytmp3:       require("./ytmp3.service"),
-    spotifyplay: require("./spotifyplay.service"),
-    spotify:     require("./spotify.service"),
-    applemusic:  require("./applemusic.service"),
-    soundcloud:  require("./soundcloud.service"),
+    // ═════════════════════════════════════════════
+    //  🌟 UNIVERSAL (auto-detect)
+    // ═════════════════════════════════════════════
+    dl: require("./dl"),
 
-    // ─── Video ──────────────────────────────────────
-    ytmp4:       require("./ytmp4.service"),
+    // ═════════════════════════════════════════════
+    //  🎵 MUSIC
+    // ═════════════════════════════════════════════
+    play: require("./play"),
+    ytmp3: require("./ytmp3"),
+    spotifyplay: require("./spotifyplay"),
+    spotify: require("./spotify"),
+    applemusic: require("./applemusic"),
+    soundcloud: require("./soundcloud"),
 
-    // ─── Social ─────────────────────────────────────
-    instagram:   require("./instagram.service"),
-    facebook:    require("./facebook.service"),
-    tiktok:      require("./tiktok.service"),
-    twitter:     require("./twitter.service"),
-    pinterest:   require("./pinterest.service"),
+    // ═════════════════════════════════════════════
+    //  🎬 VIDEO
+    // ═════════════════════════════════════════════
+    ytmp4: require("./ytmp4"),
 
-    // ─── File Hosts ─────────────────────────────────
-    gdrive:      require("./gdrive.service"),
-    mediafire:   require("./mediafire.service"),
-    terabox:     require("./terabox.service"),
-    github:      require("./github.service")
+    // ═════════════════════════════════════════════
+    //  📱 SOCIAL MEDIA
+    // ═════════════════════════════════════════════
+    instagram: require("./instagram"),
+    facebook: require("./facebook"),
+    tiktok: require("./tiktok"),
+    twitter: require("./twitter"),
+    pinterest: require("./pinterest"),
+
+    // ═════════════════════════════════════════════
+    //  📦 FILE HOSTS & CLOUD
+    // ═════════════════════════════════════════════
+    gdrive: require("./gdrive"),
+    mediafire: require("./mediafire"),
+    terabox: require("./terabox"),
+    github: require("./github"),
+
+    // ═════════════════════════════════════════════
+    //  🛠️ UTILITY
+    // ═════════════════════════════════════════════
+    status: require("./status"),
+    cancel: require("./cancel")
 };
