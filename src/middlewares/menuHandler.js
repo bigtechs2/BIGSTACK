@@ -1,6 +1,6 @@
 // ──────────────────────────────────────────────────
 //  BIGSTACK — Menu Handler Middleware
-//  Handles menu:* buttons ⏤ uses URL banner
+//  Handles all menu:* callback buttons
 //  © BIGSTACK by bigmanjtech™ with ♥︎
 // ──────────────────────────────────────────────────
 
@@ -8,29 +8,31 @@ const logger = require("../core/logger");
 const config = require("../config");
 
 // ══════════════════════════════════════════════════
-//  Categories
+//  Category definitions
 // ══════════════════════════════════════════════════
 const CATEGORIES = {
     downloader: {
         title: "◇ DOWNLOADER",
         desc: "Download media from any supported platform.",
         commands: [
-            ["play",         "YouTube audio search"],
-            ["ytmp3",        "YouTube → MP3"],
-            ["ytmp4",        "YouTube → MP4"],
-            ["spotify",      "Spotify track URL"],
-            ["spotifyplay",  "Spotify search"],
-            ["applemusic",   "Apple Music"],
-            ["soundcloud",   "SoundCloud"],
-            ["instagram",    "Instagram posts"],
-            ["tiktok",       "TikTok videos"],
-            ["twitter",      "Twitter / X"],
-            ["facebook",     "Facebook videos"],
-            ["pinterest",    "Pinterest pins"],
-            ["gdrive",       "Google Drive"],
-            ["mediafire",    "MediaFire"],
-            ["terabox",      "Terabox"],
-            ["github",       "GitHub repos"]
+            ["play",        "YouTube audio search"],
+            ["ytmp3",       "YouTube → MP3"],
+            ["ytmp4",       "YouTube → MP4"],
+            ["spotify",     "Spotify track URL"],
+            ["spotifyplay", "Spotify search"],
+            ["applemusic",  "Apple Music"],
+            ["soundcloud",  "SoundCloud"],
+            ["instagram",   "Instagram posts"],
+            ["tiktok",      "TikTok videos"],
+            ["twitter",     "Twitter / X"],
+            ["facebook",    "Facebook videos"],
+            ["pinterest",   "Pinterest pins"],
+            ["gdrive",      "Google Drive"],
+            ["mediafire",   "MediaFire"],
+            ["terabox",     "Terabox"],
+            ["github",      "GitHub repos"],
+            ["status",      "Active downloads"],
+            ["cancel",      "Cancel download"]
         ]
     },
     search: {
@@ -71,8 +73,7 @@ const CATEGORIES = {
         commands: [
             ["profile", "Your stats"],
             ["balance", "Coin balance"],
-            ["refer",   "Invite link"],
-            ["id",      "Your Telegram ID"]
+            ["refer",   "Invite link"]
         ]
     },
     daily: {
@@ -104,35 +105,26 @@ const CATEGORIES = {
         title: "? HELP",
         desc: "Get help using the bot.",
         commands: [
-            ["help",   "Command list"],
-            ["about",  "About BIGSTACK"],
-            ["ping",   "Check latency"],
-            ["alive",  "Bot status"],
-            ["report", "Report a bug"]
+            ["help",  "Command list"],
+            ["about", "About BIGSTACK"]
+        ]
+    },
+    report: {
+        title: "✗ REPORT",
+        desc: "Send a bug report to the owner.",
+        commands: [
+            ["report", "Report a bug or issue"]
         ]
     }
 };
 
 // ══════════════════════════════════════════════════
-//  Get banner URL
-// ══════════════════════════════════════════════════
-function getBannerUrl() {
-    return (
-        config.branding?.bannerUrl ||
-        config.branding?.banner ||
-        config.branding?.logo ||
-        null
-    );
-}
-
-// ══════════════════════════════════════════════════
-//  Category screen
+//  Build category screen
 // ══════════════════════════════════════════════════
 function buildCategoryScreen(key) {
     const cat = CATEGORIES[key];
     if (!cat) return null;
 
-    const prefix = config.prefix;
     const lines = [
         `◈ *${cat.title}*\n`,
         `▸ ${cat.desc}\n`,
@@ -140,7 +132,7 @@ function buildCategoryScreen(key) {
     ];
 
     for (const [cmd, desc] of cat.commands) {
-        lines.push(`   ➤ ${prefix}${cmd} ⏤ ${desc}`);
+        lines.push(`   ➤ \`/${cmd}\` ⏤ ${desc}`);
     }
 
     lines.push("");
@@ -163,16 +155,10 @@ function backKeyboard() {
 // ══════════════════════════════════════════════════
 //  Home screen
 // ══════════════════════════════════════════════════
-function buildHomeCaption() {
+function buildHomeScreen() {
     return (
         `◈ *BIGSTACK MENU*\n\n` +
-        `▸ Your all-in-one media assistant.\n\n` +
-        `▸ Choose a category below:\n` +
-        `   ◇ Downloader\n` +
-        `   ◈ Search\n` +
-        `   ◉ AI Assistant\n` +
-        `   ★ Profile\n` +
-        `   ☆ Daily Coins\n\n` +
+        `▸ Pick a category below to explore\n\n` +
         `▸ ${config.footer}`
     );
 }
@@ -181,88 +167,34 @@ function homeKeyboard() {
     return {
         inline_keyboard: [
             [
-                { text: "◇ Downloader", callback_data: "menu:downloader" },
-                { text: "◈ Search", callback_data: "menu:search" }
+                { text: "◇ Downloader",   callback_data: "menu:downloader" },
+                { text: "◈ Search",       callback_data: "menu:search" }
             ],
             [
                 { text: "◉ AI Assistant", callback_data: "menu:ai" },
-                { text: "▣ Player", callback_data: "menu:player" }
+                { text: "▣ Player",       callback_data: "menu:player" }
             ],
             [
-                { text: "★ Profile", callback_data: "menu:profile" },
-                { text: "☆ Daily Coins", callback_data: "menu:daily" }
+                { text: "★ Profile",      callback_data: "menu:profile" },
+                { text: "☆ Daily Coins",  callback_data: "menu:daily" }
             ],
             [
-                { text: "★ Store", callback_data: "menu:store" },
-                { text: "⚙ Settings", callback_data: "menu:settings" }
+                { text: "★ Store",        callback_data: "menu:store" },
+                { text: "⚙ Settings",     callback_data: "menu:settings" }
             ],
             [
-                { text: "? Help", callback_data: "menu:help" }
+                { text: "? Help",         callback_data: "menu:help" },
+                { text: "✗ Report",       callback_data: "menu:report" }
             ]
         ]
     };
 }
 
 // ══════════════════════════════════════════════════
-//  Send home (with URL banner)
-// ══════════════════════════════════════════════════
-async function sendHome(ctx, isEdit = false) {
-    const bannerUrl = getBannerUrl();
-    const hasUrl = bannerUrl && /^https?:\/\//i.test(bannerUrl);
-
-    // ─── With URL image ⏤ EDIT mode ─────────────────
-    if (hasUrl && isEdit) {
-        try {
-            await ctx.editMessageMedia(
-                {
-                    type: "photo",
-                    media: bannerUrl,
-                    caption: buildHomeCaption(),
-                    parse_mode: "Markdown"
-                },
-                { reply_markup: homeKeyboard() }
-            );
-            return;
-        } catch (err) {
-            logger.warn(`[menuHandler] edit photo failed: ${err.message}`);
-        }
-    }
-
-    // ─── With URL image ⏤ SEND mode ─────────────────
-    if (hasUrl && !isEdit) {
-        try {
-            await ctx.replyWithPhoto(bannerUrl, {
-                caption: buildHomeCaption(),
-                parse_mode: "Markdown",
-                reply_markup: homeKeyboard()
-            });
-            return;
-        } catch (err) {
-            logger.warn(`[menuHandler] send photo failed: ${err.message}`);
-        }
-    }
-
-    // ─── Fallback ⏤ text only ───────────────────────
-    if (isEdit) {
-        try {
-            await ctx.editMessageText(buildHomeCaption(), {
-                parse_mode: "Markdown",
-                reply_markup: homeKeyboard()
-            });
-            return;
-        } catch { /* ignore */ }
-    }
-
-    await ctx.reply(buildHomeCaption(), {
-        parse_mode: "Markdown",
-        reply_markup: homeKeyboard()
-    });
-}
-
-// ══════════════════════════════════════════════════
 //  Main middleware
 // ══════════════════════════════════════════════════
 async function menuHandler(ctx, next) {
+    // Only handle callback queries
     if (!ctx.callbackQuery) return next();
 
     const data = ctx.callbackQuery.data;
@@ -270,38 +202,80 @@ async function menuHandler(ctx, next) {
 
     const key = data.split(":")[1];
 
-    // ─── Home ────────────────────────────────────
+    // ═══════════════════════════════════════════
+    //  Home
+    // ═══════════════════════════════════════════
     if (key === "home") {
         await ctx.answerCallbackQuery();
-        await sendHome(ctx, true);
+        try {
+            await ctx.editMessageText(buildHomeScreen(), {
+                parse_mode: "Markdown",
+                reply_markup: homeKeyboard()
+            });
+        } catch {
+            await ctx.reply(buildHomeScreen(), {
+                parse_mode: "Markdown",
+                reply_markup: homeKeyboard()
+            });
+        }
         return;
     }
 
-    // ─── Store shortcut ──────────────────────────
+    // ═══════════════════════════════════════════
+    //  Store shortcut
+    // ═══════════════════════════════════════════
     if (key === "store") {
         await ctx.answerCallbackQuery();
         try {
             await ctx.editMessageText(
                 `◈ *STORE*\n\n` +
-                `▸ Use /store to open the coin shop.\n` +
-                `▸ Or /buy for mobile money payments.\n\n` +
+                `▸ Use /store to open the coin shop\n` +
+                `▸ Use /buy for mobile money payments\n\n` +
                 `▸ ${config.footer}`,
                 {
                     parse_mode: "Markdown",
                     reply_markup: {
-                        inline_keyboard: [
-                            [{ text: "◀ Back", callback_data: "menu:home" }]
-                        ]
+                        inline_keyboard: [[
+                            { text: "◀ Back", callback_data: "menu:home" }
+                        ]]
                     }
                 }
             );
         } catch {
-            await ctx.reply("◈ Use /store to open the shop.", { parse_mode: "Markdown" });
+            await ctx.reply("◈ Use /store to open the shop.");
         }
         return;
     }
 
-    // ─── Category ────────────────────────────────
+    // ═══════════════════════════════════════════
+    //  Report shortcut
+    // ═══════════════════════════════════════════
+    if (key === "report") {
+        await ctx.answerCallbackQuery();
+        try {
+            await ctx.editMessageText(
+                `✗ *REPORT A BUG*\n\n` +
+                `▸ Use \`/report <issue>\` to send an issue\n\n` +
+                `▸ Example\n` +
+                `   \`/report /play fails when searching\`\n\n` +
+                `▸ Your report goes directly to the owner.\n\n` +
+                `▸ ${config.footer}`,
+                {
+                    parse_mode: "Markdown",
+                    reply_markup: {
+                        inline_keyboard: [[
+                            { text: "◀ Back", callback_data: "menu:home" }
+                        ]]
+                    }
+                }
+            );
+        } catch {}
+        return;
+    }
+
+    // ═══════════════════════════════════════════
+    //  Category
+    // ═══════════════════════════════════════════
     const text = buildCategoryScreen(key);
     if (!text) {
         return ctx.answerCallbackQuery({
