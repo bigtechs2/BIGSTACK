@@ -3,28 +3,63 @@
 //  © BIGSTACK by bigmanjtech™ with ♥︎
 // ──────────────────────────────────────────────────
 
+// ══════════════════════════════════════════════════
+//  MUSIC SERVICES
+// ══════════════════════════════════════════════════
+const play = require("./play.service");
+const ytmp3 = require("./ytmp3.service");
+const spotifyplay = require("./spotifyplay.service");
+const spotify = require("./spotify.service");
+const applemusic = require("./applemusic.service");
+const soundcloud = require("./soundcloud.service");
+
+// ══════════════════════════════════════════════════
+//  VIDEO SERVICES
+// ══════════════════════════════════════════════════
+const ytmp4 = require("./ytmp4.service");
+
+// ══════════════════════════════════════════════════
+//  SOCIAL MEDIA SERVICES
+// ══════════════════════════════════════════════════
+const instagram = require("./instagram.service");
+const facebook = require("./facebook.service");
+const tiktok = require("./tiktok.service");
+const twitter = require("./twitter.service");
+const pinterest = require("./pinterest.service");
+
+// ══════════════════════════════════════════════════
+//  FILE HOSTS & CLOUD STORAGE
+// ══════════════════════════════════════════════════
+const gdrive = require("./gdrive.service");
+const mediafire = require("./mediafire.service");
+const terabox = require("./terabox.service");
+const github = require("./github.service");
+
+// ══════════════════════════════════════════════════
+//  EXPORT
+// ══════════════════════════════════════════════════
 module.exports = {
     // ─── Music ──────────────────────────────────────
-    play:        require("./play.service"),
-    ytmp3:       require("./ytmp3.service"),
-    spotifyplay: require("./spotifyplay.service"),
-    spotify:     require("./spotify.service"),
-    applemusic:  require("./applemusic.service"),
-    soundcloud:  require("./soundcloud.service"),
+    play,
+    ytmp3,
+    spotifyplay,
+    spotify,
+    applemusic,
+    soundcloud,
 
-    // ─── video export ──────────────────────────────────────
-    ytmp4:       require("./ytmp4.service"),
+    // ─── Video ──────────────────────────────────────
+    ytmp4,
 
-    // ─── Social ─────────────────────────────────────
-    instagram:   require("./instagram.service"),
-    facebook:    require("./facebook.service"),
-    tiktok:      require("./tiktok.service"),
-    twitter:     require("./twitter.service"),
-    pinterest:   require("./pinterest.service"),
+    // ─── Social Media ───────────────────────────────
+    instagram,
+    facebook,
+    tiktok,
+    twitter,
+    pinterest,
 
-    // ─── File Hosts ─────────────────────────────────
-    gdrive:      require("./gdrive.service"),
-    mediafire:   require("./mediafire.service"),
-    terabox:     require("./terabox.service"),
-    github:      require("./github.service")
+    // ─── File Hosts & Cloud ─────────────────────────
+    gdrive,
+    mediafire,
+    terabox,
+    github
 };
