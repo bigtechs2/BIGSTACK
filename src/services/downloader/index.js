@@ -12,7 +12,7 @@ module.exports = {
     applemusic:  require("./applemusic.service"),
     soundcloud:  require("./soundcloud.service"),
 
-    // ─── Video ──────────────────────────────────────
+    // ─── video export ──────────────────────────────────────
     ytmp4:       require("./ytmp4.service"),
 
     // ─── Social ─────────────────────────────────────
