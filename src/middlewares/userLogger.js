@@ -2,131 +2,85 @@
 //  BIGSTACK — User Logger Middleware
 //  © BIGSTACK by bigmanjtech™ with ♥︎
 //
-//  Runs on EVERY message. Does:
-//  - Registers user in DB (first time)
-//  - Detects command use
-//  - Forwards new users to ACTIVITY group
-//  - Tracks command in stats
+//  Registers every user in the database.
+//  Generates a referral code on first registration.
 // ──────────────────────────────────────────────────
 
 const logger = require("../core/logger");
-const statsTracker = require("../core/statsTracker");
 const User = require("../database/models/User");
 
-// ─── Track which users we've already registered this session ─
-// Prevents duplicate DB writes for the same user
+// ─── Track registered users in memory (avoid DB hit every message) ───
 const registeredUsers = new Set();
 
+// ─── Build referral code ────────────────────────────
+function buildReferralCode(telegramId) {
+    const idPart = String(telegramId).slice(-10);
+    const rand = Math.random().toString(36).slice(2, 8).toUpperCase();
+    return `BS${idPart}${rand}`;
+}
+
+// ══════════════════════════════════════════════════
+//  Main middleware
+// ══════════════════════════════════════════════════
 async function userLogger(ctx, next) {
-    // ─── Skip if no user (channels, etc.) ───────────
-    if (!ctx.from || ctx.from.is_bot) {
-        return next();
-    }
+    // ─── Skip if no user ────────────────────────────
+    if (!ctx.from || ctx.from.is_bot) return next();
 
     const userId = String(ctx.from.id);
 
-    // ─── 1. First-time registration in DB ──────────
-    if (!registeredUsers.has(userId)) {
-        try {
-            let user = await User.findOne({ telegramId: userId });
+    // ─── Already registered this session? ───────────
+    if (registeredUsers.has(userId)) {
+        return next();
+    }
 
-            if (!user) {
-                user = await User.create({
-                    telegramId: userId,
-                    username: ctx.from.username || null,
-                    firstName: ctx.from.first_name || null,
-                    lastName: ctx.from.last_name || null,
-                    language: ctx.from.language_code || "en",
-                    coins: 0,
-                    premium: false,
-                    banned: false,
-                    createdAt: new Date(),
-                    lastSeen: new Date()
-                });
+    try {
+        let user = await User.findOne({ telegramId: userId });
 
-                // ─── Announce new user to ACTIVITY group ─
-                await logger.activity("new_user", {
-                    name: `${ctx.from.first_name || ""} ${ctx.from.last_name || ""}`.trim(),
-                    username: ctx.from.username || null,
-                    userId
-                }).catch(() => {});
+        if (!user) {
+            // ─── Create new user ───────────────────
+            user = await User.create({
+                telegramId: userId,
+                username: ctx.from.username || null,
+                firstName: ctx.from.first_name || null,
+                lastName: ctx.from.last_name || null,
+                language: ctx.from.language_code || "en",
+                referralCode: buildReferralCode(userId)
+            });
 
-                // ─── Track for stats ─────────────────
-                await statsTracker.trackNewUser(ctx);
+            logger.info(`[userLogger] new user: ${userId} (@${ctx.from.username || "no-username"})`);
+        } else {
+            // ─── Update last seen ──────────────────
+            user.lastSeen = new Date();
+            if (ctx.from.username) user.username = ctx.from.username;
 
-                logger.info(`[userLogger] 👤 new user: ${userId} (@${ctx.from.username || "no-username"})`);
-            } else {
-                // Update last seen + username (they might have changed it)
-                user.lastSeen = new Date();
-                if (ctx.from.username) user.username = ctx.from.username;
-                await user.save().catch(() => {});
+            // ─── Backfill referral code if missing ─
+            if (!user.referralCode) {
+                user.referralCode = buildReferralCode(userId);
             }
 
-            // Attach user to ctx for other middlewares
-            ctx.user = user;
-
-            // Remember we've registered this user
-            registeredUsers.add(userId);
-
-        } catch (err) {
-            logger.warn(`[userLogger] registration failed: ${err.message}`);
-            // Continue anyway — don't block the bot
+            await user.save().catch(() => {});
         }
-    } else {
-        // Already known — just load from DB (cache would be better)
-        try {
-            ctx.user = await User.findOne({ telegramId: userId });
-        } catch {
-            ctx.user = null;
-        }
-    }
 
-    // ─── 2. Track command if this is one ───────────
-    // Note: commandName is attached by the loader middleware
-    // We track it AFTER the command runs to catch success/failure.
-    // So here, we just setup the timer.
+        // ─── Attach user to context ────────────────
+        ctx.user = user;
 
-    const startTime = Date.now();
+        // ─── Mark as registered ────────────────────
+        registeredUsers.add(userId);
 
-    // ─── 3. Run the next middleware/command ────────
-    try {
-        await next();
     } catch (err) {
-        // ─── Command threw error ────────────────────
-        if (ctx.commandName) {
-            await statsTracker.trackCommand(ctx, {
-                success: false,
-                durationMs: Date.now() - startTime,
-                error: err
-            }).catch(() => {});
-        }
-        throw err; // re-throw so errorHandler can catch
-    }
-
-    // ─── 4. If a command ran, track it ─────────────
-    if (ctx.commandName) {
-        const durationMs = Date.now() - startTime;
-
-        await statsTracker.trackCommand(ctx, {
-            success: true,
-            durationMs,
-            provider: ctx.provider || null
-        }).catch(() => {});
-
-        // Optional: forward command use to ACTIVITY group
-        // (disabled by default in config to prevent spam)
-        if (ctx.config?.logging?.groups?.activity?.sendCommands) {
-            await logger.activity("command", {
-                userId,
-                username: ctx.from.username,
-                command: ctx.commandName,
-                chatType: ctx.chat?.type
-            }).catch(() => {});
+        // ─── Duplicate key (should not happen now) ─
+        if (err.code === 11000) {
+            logger.warn(`[userLogger] duplicate for ${userId}, retrying fetch`);
+            ctx.user = await User.findOne({ telegramId: userId }).catch(() => null);
+        } else {
+            logger.warn(`[userLogger] registration failed: ${err.message}`);
         }
     }
+
+    return next();
 }
 
-// ─── Clear cache on shutdown ────────────────────────
+// ─── Cleanup ────────────────────────────────────────
 function cleanup() {
     registeredUsers.clear();
 }
