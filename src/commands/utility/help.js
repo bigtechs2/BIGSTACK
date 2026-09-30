@@ -1,15 +1,16 @@
 // ──────────────────────────────────────────────────
 //  BIGSTACK — /help Command
-//  Banner + quoted lists + tappable commands
+//  Hardcoded banner + quoted lists + tappable commands
 //  © BIGSTACK by bigmanjtech™ with ♥︎
 // ──────────────────────────────────────────────────
 
-const path = require("path");
-const fs = require("fs");
-const { InputFile } = require("grammy");
-
 const config = require("../../config");
 const logger = require("../../core/logger");
+
+// ══════════════════════════════════════════════════
+//  HARDCODED BANNER
+// ══════════════════════════════════════════════════
+const HELP_BANNER = "https://files.catbox.moe/8hssi5.jpg";
 
 // ══════════════════════════════════════════════════
 //  Build help text
@@ -100,25 +101,6 @@ function buildHelpText() {
 }
 
 // ══════════════════════════════════════════════════
-//  Resolve banner (URL or local file)
-// ══════════════════════════════════════════════════
-function resolveBanner() {
-    const banner = config.branding?.banner || config.branding?.helpImage;
-    if (!banner) return null;
-
-    if (banner.startsWith("http://") || banner.startsWith("https://")) {
-        return banner;
-    }
-
-    const abs = path.resolve(__dirname, "../../", banner);
-    if (fs.existsSync(abs)) {
-        return new InputFile(abs);
-    }
-
-    return null;
-}
-
-// ══════════════════════════════════════════════════
 //  Main command
 // ══════════════════════════════════════════════════
 module.exports = {
@@ -142,21 +124,18 @@ module.exports = {
         logger.info(`[/help] ${ctx.from.id}`);
 
         const text = buildHelpText();
-        const banner = resolveBanner();
 
-        // ─── With banner ────────────────────────────
-        if (banner) {
-            try {
-                return await ctx.replyWithPhoto(banner, {
-                    caption: text,
-                    parse_mode: "HTML"
-                });
-            } catch (err) {
-                logger.warn(`[/help] banner failed: ${err.message}`);
-            }
+        // ─── Send with hardcoded banner ─────────────
+        try {
+            return await ctx.replyWithPhoto(HELP_BANNER, {
+                caption: text,
+                parse_mode: "HTML"
+            });
+        } catch (err) {
+            logger.warn(`[/help] banner failed: ${err.message}`);
         }
 
-        // ─── Text only ──────────────────────────────
+        // ─── Fallback: text only ────────────────────
         await ctx.reply(text, { parse_mode: "HTML" });
     }
 };
