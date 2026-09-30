@@ -55,17 +55,13 @@ const userSchema = new mongoose.Schema(
 
         // ══════════════════════════════════════════
         //  REFERRAL
-        //  NOTE: unique + sparse removed ⏤
-        //  enforced in code via generateReferralCode()
+        //  NOTE: no unique, no index here
+        //  Non-unique index is created below
         // ══════════════════════════════════════════
         referrerId: { type: String, default: null, index: true },
         referralCount: { type: Number, default: 0 },
         referralEarnings: { type: Number, default: 0 },
-        referralCode: {
-            type: String,
-            default: null,
-            index: true
-        },
+        referralCode: { type: String, default: null },
 
         // ══════════════════════════════════════════
         //  AI
@@ -129,6 +125,7 @@ userSchema.index({ premium: 1, premiumExpiry: -1 });
 userSchema.index({ lastSeen: -1 });
 userSchema.index({ referralCount: -1 });
 userSchema.index({ createdAt: -1 });
+userSchema.index({ referralCode: 1 });   // non-unique
 
 // ══════════════════════════════════════════════════
 //  VIRTUALS
@@ -159,10 +156,18 @@ userSchema.set("toJSON", { virtuals: true });
 userSchema.set("toObject", { virtuals: true });
 
 // ══════════════════════════════════════════════════
+//  HELPER: Generate referral code
+// ══════════════════════════════════════════════════
+function buildReferralCode(telegramId) {
+    const idPart = String(telegramId).slice(-10);
+    const rand = Math.random().toString(36).slice(2, 8).toUpperCase();
+    return `BS${idPart}${rand}`;
+}
+
+// ══════════════════════════════════════════════════
 //  INSTANCE METHODS
 // ══════════════════════════════════════════════════
 
-// ─── Add coins ──────────────────────────────────────
 userSchema.methods.addCoins = function (amount) {
     if (amount <= 0) return this;
     this.coins += amount;
@@ -170,7 +175,6 @@ userSchema.methods.addCoins = function (amount) {
     return this;
 };
 
-// ─── Deduct coins ───────────────────────────────────
 userSchema.methods.deductCoins = function (amount) {
     if (amount <= 0) return this;
     if (this.coins < amount) throw new Error("Insufficient coins");
@@ -179,12 +183,10 @@ userSchema.methods.deductCoins = function (amount) {
     return this;
 };
 
-// ─── Can afford? ────────────────────────────────────
 userSchema.methods.canAfford = function (amount) {
     return this.coins >= amount;
 };
 
-// ─── Upgrade to premium ─────────────────────────────
 userSchema.methods.upgradePremium = function (plan) {
     const durations = { weekly: 7, monthly: 30, yearly: 365 };
     const days = durations[plan] || 30;
@@ -203,7 +205,6 @@ userSchema.methods.upgradePremium = function (plan) {
     return this;
 };
 
-// ─── Remove premium ─────────────────────────────────
 userSchema.methods.removePremium = function () {
     this.premium = false;
     this.premiumExpiry = null;
@@ -211,7 +212,6 @@ userSchema.methods.removePremium = function () {
     return this;
 };
 
-// ─── Ban user ───────────────────────────────────────
 userSchema.methods.ban = function (reason = "No reason given") {
     this.banned = true;
     this.banReason = reason;
@@ -219,7 +219,6 @@ userSchema.methods.ban = function (reason = "No reason given") {
     return this;
 };
 
-// ─── Unban user ─────────────────────────────────────
 userSchema.methods.unban = function () {
     this.banned = false;
     this.banReason = null;
@@ -227,27 +226,23 @@ userSchema.methods.unban = function () {
     return this;
 };
 
-// ─── Update last seen ───────────────────────────────
 userSchema.methods.touch = function () {
     this.lastSeen = new Date();
     return this;
 };
 
-// ─── Increment command count ────────────────────────
 userSchema.methods.recordCommand = function () {
     this.totalCommands += 1;
     this.lastSeen = new Date();
     return this;
 };
 
-// ─── Increment download count ───────────────────────
 userSchema.methods.recordDownload = function () {
     this.totalDownloads += 1;
     this.lastSeen = new Date();
     return this;
 };
 
-// ─── Claim daily reward (with streak) ───────────────
 userSchema.methods.claimDaily = function (amount) {
     this.lastClaimAt = new Date();
     this.totalClaims += 1;
@@ -272,7 +267,6 @@ userSchema.methods.claimDaily = function (amount) {
     return this;
 };
 
-// ─── Can claim daily? ───────────────────────────────
 userSchema.methods.canClaimDaily = function (cooldownMs = 24 * 60 * 60 * 1000) {
     if (!this.lastClaimAt) return { ok: true, remaining: 0 };
 
@@ -283,29 +277,12 @@ userSchema.methods.canClaimDaily = function (cooldownMs = 24 * 60 * 60 * 1000) {
     return { ok: false, remaining };
 };
 
-// ══════════════════════════════════════════════════
-//  REFERRAL CODE GENERATOR
-//  Guaranteed unique ⏤ uses telegramId + random
-// ══════════════════════════════════════════════════
 userSchema.methods.generateReferralCode = function () {
     if (this.referralCode) return this.referralCode;
-
-    // ─── Build unique code ────────────────────────
-    // Format: BS + telegramId (up to 10) + random (6 chars)
-    // Example: BS8594354663ABC123
-    const idPart = String(this.telegramId).slice(-10);
-    const randomPart = Math.random()
-        .toString(36)
-        .slice(2, 8)
-        .toUpperCase();
-
-    const code = `BS${idPart}${randomPart}`;
-
-    this.referralCode = code;
-    return code;
+    this.referralCode = buildReferralCode(this.telegramId);
+    return this.referralCode;
 };
 
-// ─── Apply referral (for new user) ──────────────────
 userSchema.methods.applyReferral = function (referrerId, refereeBonus) {
     if (this.referrerId) return this;
     this.referrerId = referrerId;
@@ -329,15 +306,18 @@ userSchema.statics.findOrCreate = async function (telegramUser) {
             firstName: telegramUser.first_name || null,
             lastName: telegramUser.last_name || null,
             language: telegramUser.language_code || "en",
-            isBot: telegramUser.is_bot || false
+            isBot: telegramUser.is_bot || false,
+            referralCode: buildReferralCode(telegramId)
         });
-        user.generateReferralCode();
-        await user.save().catch(() => {});
     } else {
         if (telegramUser.username) user.username = telegramUser.username;
         if (telegramUser.first_name) user.firstName = telegramUser.first_name;
         if (telegramUser.last_name) user.lastName = telegramUser.last_name;
         user.lastSeen = new Date();
+
+        if (!user.referralCode) {
+            user.referralCode = buildReferralCode(telegramId);
+        }
     }
 
     return user;
