@@ -1,67 +1,113 @@
 // ──────────────────────────────────────────────────
 //  BIGSTACK — /execute Command
-//  Run JS and return output (owner only)
+//  Run arbitrary JS in isolated context (owner only)
 //  © BIGSTACK by bigmanjtech™ with ♥︎
 // ──────────────────────────────────────────────────
 
-const util = require("util");
+const vm = require("vm");
+const { exec } = require("child_process");
+const { promisify } = require("util");
+
 const config = require("../../config");
 const logger = require("../../core/logger");
-const cache = require("../../core/cache");
-const services = require("../../services");
+const validator = require("../../utils/cmdValidator");
 
-const AsyncFunction = Object.getPrototypeOf(async function () {})
-    .constructor;
+const execAsync = promisify(exec);
 
 // ══════════════════════════════════════════════════
-//  Sanitize output for Telegram
+//  Run JS in sandbox
 // ══════════════════════════════════════════════════
-function safeOutput(value) {
-    let str;
+async function runJs(code) {
+    const logs = [];
 
-    if (typeof value === "string") {
-        str = value;
-    } else if (value === undefined) {
-        str = "undefined";
-    } else {
-        str = util.inspect(value, {
-            depth: 3,
-            colors: false,
-            maxArrayLength: 20,
-            maxStringLength: 500
+    // ─── Capture console.log ────────────────────────
+    const captureConsole = {
+        log: (...args) => logs.push(args.map(String).join(" ")),
+        error: (...args) => logs.push("ERR: " + args.map(String).join(" ")),
+        warn: (...args) => logs.push("WARN: " + args.map(String).join(" ")),
+        info: (...args) => logs.push("INFO: " + args.map(String).join(" "))
+    };
+
+    // ─── Sandbox ────────────────────────────────────
+    const sandbox = {
+        console: captureConsole,
+        require,
+        process,
+        Buffer,
+        setTimeout,
+        clearTimeout,
+        setInterval,
+        clearInterval,
+        Promise,
+        Date,
+        Math,
+        JSON,
+        Object,
+        Array,
+        String,
+        Number,
+        Boolean,
+        Error,
+        RegExp,
+        Map,
+        Set,
+        Symbol,
+        parseInt,
+        parseFloat,
+        isNaN,
+        isFinite,
+        global
+    };
+
+    const context = vm.createContext(sandbox);
+
+    // ─── Run ────────────────────────────────────────
+    const startTime = Date.now();
+
+    let result;
+    let error = null;
+
+    try {
+        result = vm.runInContext(code, context, { timeout: 10000 });
+    } catch (err) {
+        error = err;
+    }
+
+    const duration = Date.now() - startTime;
+
+    return { logs, result, error, duration };
+}
+
+// ══════════════════════════════════════════════════
+//  Run shell command
+// ══════════════════════════════════════════════════
+async function runShell(command) {
+    try {
+        const { stdout, stderr } = await execAsync(command, {
+            timeout: 30000,
+            maxBuffer: 1024 * 1024
         });
+        return { ok: true, stdout, stderr };
+    } catch (err) {
+        return {
+            ok: false,
+            stdout: err.stdout || "",
+            stderr: err.stderr || "",
+            error: err.message
+        };
     }
-
-    // Truncate for Telegram
-    if (str.length > 3500) {
-        str = str.slice(0, 3500) + "\n... (truncated)";
-    }
-
-    return str;
 }
 
 // ══════════════════════════════════════════════════
-//  Run JS code
-// ══════════════════════════════════════════════════
-async function runJS(code, ctx) {
-    const fn = new AsyncFunction(
-        "require", "config", "services", "cache", "logger", "ctx",
-        code
-    );
-
-    return await fn(require, config, services, cache, logger, ctx);
-}
-
-// ══════════════════════════════════════════════════
-//  Command
+//  Main command
 // ══════════════════════════════════════════════════
 module.exports = {
     name: "execute",
-    aliases: ["exec", "eval"],
+    aliases: ["exec", "eval", "run", "sh"],
     category: "utility",
-    description: "Execute JS code (owner only)",
+    description: "Execute JS or shell (owner only)",
     emoji: "◈",
-    usage: "<code>",
+    usage: "<code> or reply to a code block",
 
     permissions: {
         coin: 0,
@@ -73,74 +119,98 @@ module.exports = {
     },
 
     code: async (ctx) => {
-        const code = ctx.args.join(" ").trim();
+        const args = ctx.args.join(" ").trim();
+        const replied = ctx.message?.reply_to_message;
+        const repliedText = replied?.text || replied?.caption || "";
+
+        // ═══════════════════════════════════════════
+        //  Get the code to run
+        // ═══════════════════════════════════════════
+        let code = null;
+
+        if (args) {
+            // Inline: /execute 2+2
+            code = args;
+        } else if (repliedText) {
+            // Reply: extract from block
+            code = validator.extractCode(repliedText);
+        }
 
         if (!code) {
             return ctx.reply(
                 `◈ *EXECUTE*\n\n` +
-                `▸ Run JavaScript on the VPS\n\n` +
-                `◈ *Examples*\n` +
-                `   \`/execute 2 + 2\`\n` +
-                `   \`/execute Object.keys(services)\`\n` +
-                `   \`/execute await services.play.search("faded")\`\n` +
-                `   \`/execute process.memoryUsage()\`\n\n` +
-                `◈ *Available*\n` +
-                `   ➤ require\n` +
-                `   ➤ config\n` +
-                `   ➤ services\n` +
-                `   ➤ cache\n` +
-                `   ➤ logger\n` +
-                `   ➤ ctx (current message)\n\n` +
-                `▸ ${config.footer}`,
+                `▸ Run JavaScript in sandbox\n\n` +
+                `▸ Usage:\n` +
+                `   ➤ \`/execute <code>\`\n` +
+                `   ➤ \`/execute\` (reply to a code block)\n` +
+                `   ➤ \`/sh <command>\` ⏤ shell\n\n` +
+                `▸ Examples:\n` +
+                `   ➤ \`/execute 2 + 2\`\n` +
+                `   ➤ \`/execute Object.keys(require("os").cpus()).length\`\n` +
+                `   ➤ \`/sh df -h\`\n` +
+                `   ➤ \`/sh pm2 status\``,
                 { parse_mode: "Markdown" }
             );
         }
 
-        logger.info(`[/execute] ${ctx.from.id}: ${code.slice(0, 80)}`);
+        // ═══════════════════════════════════════════
+        //  Detect shell vs JS
+        // ═══════════════════════════════════════════
+        const isShell = ctx.commandName === "sh" || ctx.match?.startsWith("sh ");
 
-        const loading = await ctx.reply("◐ Executing...");
+        logger.info(`[/execute] ${ctx.from.id} ${isShell ? "shell" : "js"}: ${code.slice(0, 50)}`);
 
-        const startAt = Date.now();
+        // ═══════════════════════════════════════════
+        //  Run shell
+        // ═══════════════════════════════════════════
+        if (isShell) {
+            const out = await runShell(code);
+            const body =
+                `◈ *SHELL*\n\n` +
+                `▸ Command\n\`\`\`\n${code}\n\`\`\`\n\n` +
+                `▸ Output\n\`\`\`\n${(out.stdout || out.stderr || out.error || "no output").slice(0, 3500)}\n\`\`\``;
 
-        try {
-            const result = await runJS(code, ctx);
-            const elapsed = Date.now() - startAt;
-
-            const output = safeOutput(result);
-
-            await ctx.api.editMessageText(
-                ctx.chat.id,
-                loading.message_id,
-                `✓ *Output* (${elapsed}ms)\n\n` +
-                "```\n" +
-                output +
-                "\n```",
-                { parse_mode: "Markdown" }
-            ).catch(async () => {
-                // Fallback without markdown
-                await ctx.api.editMessageText(
-                    ctx.chat.id,
-                    loading.message_id,
-                    `✓ Output (${elapsed}ms)\n\n${output}`
-                );
-            });
-
-        } catch (err) {
-            const elapsed = Date.now() - startAt;
-
-            logger.error(`[/execute] failed: ${err.message}`);
-
-            const errMsg = err.stack || err.message;
-
-            await ctx.api.editMessageText(
-                ctx.chat.id,
-                loading.message_id,
-                `✗ *Error* (${elapsed}ms)\n\n` +
-                "```\n" +
-                errMsg.slice(0, 2000) +
-                "\n```",
-                { parse_mode: "Markdown" }
-            ).catch(() => {});
+            return ctx.reply(body, { parse_mode: "Markdown" });
         }
+
+        // ═══════════════════════════════════════════
+        //  Run JS
+        // ═══════════════════════════════════════════
+        const { logs, result, error, duration } = await runJs(code);
+
+        const lines = [
+            `◈ *EXECUTE*`,
+            ``,
+            `▸ *Code*`,
+            `\`\`\``,
+            code.slice(0, 500),
+            `\`\`\``,
+            ``
+        ];
+
+        if (logs.length > 0) {
+            lines.push(`▸ *Console*`);
+            lines.push(`\`\`\``);
+            lines.push(logs.join("\n").slice(0, 1500));
+            lines.push(`\`\`\``);
+            lines.push(``);
+        }
+
+        if (error) {
+            lines.push(`▸ *Error*`);
+            lines.push(`\`\`\``);
+            lines.push(error.message.slice(0, 500));
+            lines.push(`\`\`\``);
+        } else {
+            lines.push(`▸ *Result*`);
+            lines.push(`\`\`\``);
+            lines.push(String(result).slice(0, 1000));
+            lines.push(`\`\`\``);
+        }
+
+        lines.push(``);
+        lines.push(`▸ *Duration* ➤ ${duration}ms`);
+
+        await ctx.reply(lines.join("\n"), { parse_mode: "Markdown" });
     }
 };
