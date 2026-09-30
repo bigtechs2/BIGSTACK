@@ -8,8 +8,15 @@ const config = require("../../config");
 const logger = require("../../core/logger");
 const User = require("../../database/models/User");
 
+// ─── Build referral code ────────────────────────────
+function buildReferralCode(telegramId) {
+    const idPart = String(telegramId).slice(-10);
+    const rand = Math.random().toString(36).slice(2, 8).toUpperCase();
+    return `BS${idPart}${rand}`;
+}
+
 // ══════════════════════════════════════════════════
-//  Build the welcome screen
+//  Build welcome screen
 // ══════════════════════════════════════════════════
 function buildWelcome(name) {
     return (
@@ -25,7 +32,7 @@ function buildWelcome(name) {
 }
 
 // ══════════════════════════════════════════════════
-//  Build the main menu keyboard
+//  Build main menu keyboard
 // ══════════════════════════════════════════════════
 function buildKeyboard() {
     return {
@@ -77,14 +84,14 @@ module.exports = {
 
         // ─── Fetch user (fallback if middleware missed) ───
         let user = ctx.user || (await User.findOne({ telegramId }));
+
         if (!user) {
             user = await User.create({
                 telegramId,
                 firstName: ctx.from.first_name || null,
-                username: ctx.from.username || null
+                username: ctx.from.username || null,
+                referralCode: buildReferralCode(telegramId)
             });
-            user.generateReferralCode();
-            await user.save().catch(() => {});
         }
 
         // ══════════════════════════════════════════
@@ -114,7 +121,7 @@ module.exports = {
                     await user.save().catch(() => {});
 
                     logger.info(
-                        `[/start] ${telegramId} referred by ${referrer.telegramId} (+${refereeBonus} to user, +${referrerBonus} to referrer)`
+                        `[/start] ${telegramId} referred by ${referrer.telegramId}`
                     );
 
                     // ─── Notify referrer ────────────
@@ -128,7 +135,7 @@ module.exports = {
                             { parse_mode: "Markdown" }
                         );
                     } catch {
-                        // Referrer might have blocked the bot
+                        // Referrer may have blocked the bot
                     }
                 }
             } catch (err) {
@@ -144,7 +151,6 @@ module.exports = {
             if (bonus > 0) {
                 user.addCoins(bonus);
                 await user.save().catch(() => {});
-
                 logger.info(`[/start] ${telegramId} claimed starter bonus: ${bonus}`);
             }
         }
