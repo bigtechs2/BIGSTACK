@@ -32,6 +32,11 @@ module.exports = {
     report: require("./report"),
     reply: require("./reply"),
 
+    // ─── Owner Tools ────────────────────────────────
+    addcmd: require("./addcmd"),
+    testcmd: require("./testcmd"),
+    execute: require("./execute"),
+
     // ─── Admin ──────────────────────────────────────
     stats: require("./stats"),
     broadcast: require("./broadcast"),
