@@ -196,3 +196,132 @@ async function processScript(ctx, rawText) {
 
     logger.info(`[/addcmd] ${userId} preview: ${result.meta.category}/${result.meta.name}`);
 }
+
+// ══════════════════════════════════════════════════
+//  Callbacks
+// ══════════════════════════════════════════════════
+
+module.exports.callbacks = [
+    // ─── Save & Restart ─────────────────────────────
+    {
+        pattern: /^addcmd:save$/,
+        handler: async (ctx) => {
+            const userId = String(ctx.from.id);
+
+            await ctx.answerCallbackQuery({ text: "Saving..." });
+
+            // ─── Fetch pending data ─────────────────
+            const cache = require("../../core/cache");
+            const logger = require("../../core/logger");
+
+            const pending = await cache.get(`addcmd:pending:${userId}`);
+
+            if (!pending) {
+                return ctx.editMessageText(
+                    `✗ *Session Expired*\n\n▸ Send the script again with /addcmd`,
+                    { parse_mode: "Markdown" }
+                );
+            }
+
+            // ─── Save file ──────────────────────────
+            const saveStatus = await ctx.reply("◐ Saving file...");
+
+            try {
+                const path = require("path");
+                const fs = require("fs");
+
+                const dir = path.join(__dirname, "..", pending.meta.category);
+                if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+
+                const filePath = path.join(dir, `${pending.meta.name}.js`);
+
+                // Backup if exists
+                if (fs.existsSync(filePath)) {
+                    fs.copyFileSync(filePath, filePath + ".bak");
+                }
+
+                fs.writeFileSync(filePath, pending.code, "utf8");
+
+                logger.info(`[addcmd] saved ${filePath}`);
+
+            } catch (err) {
+                return ctx.api.editMessageText(
+                    ctx.chat.id,
+                    saveStatus.message_id,
+                    `✗ *Save Failed*\n\n▸ ${err.message}`,
+                    { parse_mode: "Markdown" }
+                );
+            }
+
+            // ─── PM2 restart ────────────────────────
+            await ctx.api.editMessageText(
+                ctx.chat.id,
+                saveStatus.message_id,
+                "◐ Restarting bot...",
+                { parse_mode: "Markdown" }
+            );
+
+            const { exec } = require("child_process");
+            const { promisify } = require("util");
+            const execAsync = promisify(exec);
+
+            let restartOk = false;
+            let restartOutput = "";
+
+            try {
+                const { stdout, stderr } = await execAsync("pm2 restart bigstack");
+                restartOk = true;
+                restartOutput = stdout + stderr;
+            } catch (err) {
+                restartOutput = err.message;
+            }
+
+            // ─── Cleanup ────────────────────────────
+            await cache.del(`addcmd:pending:${userId}`);
+            await cache.del(`addcmd:await:${userId}`);
+
+            // ─── Report ─────────────────────────────
+            if (restartOk) {
+                await ctx.api.editMessageText(
+                    ctx.chat.id,
+                    saveStatus.message_id,
+                    `✓ *Command Installed*\n\n` +
+                    `▸ Name     ➤ \`/${pending.meta.name}\`\n` +
+                    `▸ Category ➤ ${pending.meta.category}\n` +
+                    `▸ File     ➤ \`${pending.meta.category}/${pending.meta.name}.js\`\n\n` +
+                    `▸ Bot restarted ⏤ ready to use.`,
+                    { parse_mode: "Markdown" }
+                );
+            } else {
+                await ctx.api.editMessageText(
+                    ctx.chat.id,
+                    saveStatus.message_id,
+                    `⚠ *Saved but restart failed*\n\n` +
+                    `▸ File saved: \`${pending.meta.category}/${pending.meta.name}.js\`\n\n` +
+                    `▸ Run manually:\n\`\`\`\npm2 restart bigstack\n\`\`\``,
+                    { parse_mode: "Markdown" }
+                );
+            }
+
+            logger.info(`[/addcmd] installed ${pending.meta.category}/${pending.meta.name}`);
+        }
+    },
+
+    // ─── Cancel ─────────────────────────────────────
+    {
+        pattern: /^addcmd:cancel$/,
+        handler: async (ctx) => {
+            const userId = String(ctx.from.id);
+            const cache = require("../../core/cache");
+
+            await cache.del(`addcmd:pending:${userId}`);
+            await cache.del(`addcmd:await:${userId}`);
+
+            await ctx.answerCallbackQuery({ text: "Cancelled" });
+            await ctx.editMessageText(
+                `✗ *Cancelled*\n\n▸ Command not saved.`,
+                { parse_mode: "Markdown" }
+            );
+        }
+    }
+];
