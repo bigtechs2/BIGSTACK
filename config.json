@@ -1,15 +1,14 @@
-{
-    "branding": {
-        "name": "BIGSTACK",
-        "tagline": "Media Downloader & Search Bot",
-        "footer": "© BIGSTACK by bigmanjtech™ with ♡",
-        "version": "1.0.0",
-        "logo": " https://files.catbox.moe/8hssi5.jpg",
-        "banner": "https://files.catbox.moe/8hssi5.jpg",
-        "welcomeImage": "https://files.catbox.moe/8hssi5.jpg",
-        "helpImage": "https://files.catbox.moe/8hssi5.jpg",
-        "thumbnail": "https://files.catbox.moe/8hssi5.jpg"
-    },
+"branding": {
+    "name": "BIGSTACK",
+    "tagline": "Media Downloader & Search Bot",
+    "footer": "© BIGSTACK by bigmanjtech™ with ♡",
+    "version": "1.0.0",
+    "logo": "https://files.catbox.moe/8hssi5.jpg",
+    "banner": "https://files.catbox.moe/8hssi5.jpg",
+    "welcomeImage": "https://files.catbox.moe/8hssi5.jpg",
+    "helpImage": "https://files.catbox.moe/8hssi5.jpg",
+    "thumbnail": "https://files.catbox.moe/8hssi5.jpg"
+},
 
     "owner": {
         "username": "bigmanj09",
