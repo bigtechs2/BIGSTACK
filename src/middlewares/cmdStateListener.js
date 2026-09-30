@@ -1,6 +1,6 @@
 // ──────────────────────────────────────────────────
 //  BIGSTACK — Command State Listener
-//  Catches messages after /addcmd
+//  Catches messages after /addcmd and Even
 //  © BIGSTACK by bigmanjtech™ with ♥︎
 // ──────────────────────────────────────────────────
 
