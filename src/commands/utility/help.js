@@ -1,71 +1,69 @@
 // ──────────────────────────────────────────────────
 //  BIGSTACK — /help Command
-//  Full command list
+//  Full command list wrapped in code block
 //  © BIGSTACK by bigmanjtech™ with ♥︎
 // ──────────────────────────────────────────────────
 
 const config = require("../../config");
+const logger = require("../../core/logger");
 
-function buildHelp(prefix) {
-    return (
-        `◈ *BIGSTACK HELP* ◈\n\n` +
+// ══════════════════════════════════════════════════
+//  Build help text ⏤ ALL inside one code block
+// ══════════════════════════════════════════════════
+function buildHelpText() {
+    const body =
+        `◈ BIGSTACK — ALL COMMANDS\n` +
+        `─────────────────────────────\n\n` +
 
-        `*◇ DOWNLOADER*\n` +
-        `   ➤ ${prefix}play <song>\n` +
-        `   ➤ ${prefix}ytmp3 <url>\n` +
-        `   ➤ ${prefix}ytmp4 <url>\n` +
-        `   ➤ ${prefix}spotify <url>\n` +
-        `   ➤ ${prefix}spotifyplay <song>\n` +
-        `   ➤ ${prefix}applemusic <url>\n` +
-        `   ➤ ${prefix}soundcloud <url>\n` +
-        `   ➤ ${prefix}instagram <url>\n` +
-        `   ➤ ${prefix}tiktok <url>\n` +
-        `   ➤ ${prefix}twitter <url>\n` +
-        `   ➤ ${prefix}facebook <url>\n` +
-        `   ➤ ${prefix}pinterest <url>\n` +
-        `   ➤ ${prefix}gdrive <url>\n` +
-        `   ➤ ${prefix}mediafire <url>\n` +
-        `   ➤ ${prefix}terabox <url>\n` +
-        `   ➤ ${prefix}github <url>\n\n` +
+        `◇ DOWNLOADER (18)\n` +
+        `   /play · /ytmp3 · /ytmp4 · /spotify\n` +
+        `   /spotifyplay · /applemusic · /soundcloud\n` +
+        `   /instagram · /tiktok · /twitter · /facebook\n` +
+        `   /pinterest · /gdrive · /mediafire\n` +
+        `   /terabox · /github · /status · /cancel\n\n` +
 
-        `*◈ SEARCH*\n` +
-        `   ➤ ${prefix}applesearch <query>\n` +
-        `   ➤ ${prefix}spotifysearch <song>\n` +
-        `   ➤ ${prefix}youtubesearch <video>\n` +
-        `   ➤ ${prefix}pinterestsearch <query>\n` +
-        `   ➤ ${prefix}imagesearch <query>\n` +
-        `   ➤ ${prefix}lyrics <song>\n` +
-        `   ➤ ${prefix}spotifylyric <url>\n` +
-        `   ➤ ${prefix}happymod <app>\n` +
-        `   ➤ ${prefix}whatmusic (reply audio)\n\n` +
+        `◈ SEARCH (9)\n` +
+        `   /applesearch · /spotifysearch · /youtubesearch\n` +
+        `   /pinterestsearch · /imagesearch · /lyrics\n` +
+        `   /spotifylyric · /happymod · /whatmusic\n\n` +
 
-        `*◉ AI*\n` +
-        `   ➤ ${prefix}ai ⏤ open AI control center\n` +
-        `   ➤ ${prefix}ai on / off ⏤ toggle AI\n\n` +
+        `★ UTILITY (30)\n` +
+        `   Core:\n` +
+        `     /start · /menu · /help · /about\n` +
+        `   Economy:\n` +
+        `     /balance · /daily · /refer · /profile\n` +
+        `     /store · /buy\n` +
+        `   Settings:\n` +
+        `     /settings · /verify · /lang\n` +
+        `   AI:\n` +
+        `     /ai · /aivoice\n` +
+        `   System:\n` +
+        `     /ping · /alive · /runtime · /report\n` +
+        `   Admin:\n` +
+        `     /stats · /broadcast · /pending\n` +
+        `     /approve · /reject · /ban · /unban · /info\n` +
+        `   Owner:\n` +
+        `     /addcmd · /testcmd · /execute\n\n` +
 
-        `*▣ UTILITY*\n` +
-        `   ➤ ${prefix}start ⏤ welcome\n` +
-        `   ➤ ${prefix}menu ⏤ main menu\n` +
-        `   ➤ ${prefix}help ⏤ this list\n` +
-        `   ➤ ${prefix}about ⏤ bot info\n` +
-        `   ➤ ${prefix}daily ⏤ claim coins\n` +
-        `   ➤ ${prefix}balance ⏤ show balance\n` +
-        `   ➤ ${prefix}refer ⏤ invite link\n` +
-        `   ➤ ${prefix}profile ⏤ your stats\n` +
-        `   ➤ ${prefix}store ⏤ buy coins\n` +
-        `   ➤ ${prefix}settings ⏤ preferences\n\n` +
+        `─────────────────────────────\n` +
+        `▸ Use /menu for buttons\n` +
+        `▸ Use /help <command> for details\n` +
+        `▸ Use /report to send bug reports\n\n` +
+        `${config.footer}`;
 
-        `▸ Type any command to start`
-    );
+    return "```\n" + body + "\n```";
 }
 
+// ══════════════════════════════════════════════════
+//  Main command
+// ══════════════════════════════════════════════════
 module.exports = {
     name: "help",
-    aliases: ["commands", "cmds"],
+    aliases: ["commands", "cmds", "h"],
     category: "utility",
     description: "Show all commands",
     emoji: "◈",
-    usage: "[no arguments]",
+    usage: "[command name]",
 
     permissions: {
         coin: 0,
@@ -77,6 +75,25 @@ module.exports = {
     },
 
     code: async (ctx) => {
-        await ctx.reply(buildHelp(config.prefix), { parse_mode: "Markdown" });
+        logger.info(`[/help] ${ctx.from.id}`);
+
+        const text = buildHelpText();
+        const helpImage =
+            config.branding?.helpImage || config.branding?.banner;
+
+        // ─── Try banner ─────────────────────────────
+        if (helpImage && helpImage.startsWith("http")) {
+            try {
+                return await ctx.replyWithPhoto(helpImage, {
+                    caption: text,
+                    parse_mode: "MarkdownV2"
+                });
+            } catch (err) {
+                logger.warn(`[/help] image failed: ${err.message}`);
+            }
+        }
+
+        // ─── Fallback: text only ────────────────────
+        await ctx.reply(text, { parse_mode: "MarkdownV2" });
     }
 };
