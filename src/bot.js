@@ -1,12 +1,9 @@
-// ──────────────────────────────────────────────────
 //  BIGSTACK — Bot Instance
 //  © BIGSTACK by bigmanjtech™ with ♥︎
 // ──────────────────────────────────────────────────
 
 const { Bot } = require("grammy");
-const { hydrateReply } = require("@grammyjs/parse-mode");
 const { autoRetry } = require("@grammyjs/auto-retry");
-const { stream } = require("@grammyjs/stream");
 
 const config = require("./config");
 const logger = require("./core/logger");
@@ -22,26 +19,19 @@ const bot = new Bot(process.env.BOT_TOKEN, {
     }
 });
 
-// ─── Attach config ──────────────────────────────────
 bot.config = config;
 
 // ══════════════════════════════════════════════════
-//  RICH MESSAGE PLUGINS
+//  PLUGINS
 // ══════════════════════════════════════════════════
 
-// ─── 1. Auto-retry ──────────────────────────────────
+// ─── Auto-retry (rate limits) ───────────────────────
 bot.api.config.use(
     autoRetry({
         maxRetryAttempts: 3,
         maxDelaySeconds: 5
     })
 );
-
-// ─── 2. Parse mode ──────────────────────────────────
-bot.use(hydrateReply);
-
-// ─── 3. Stream ──────────────────────────────────────
-bot.use(stream());
 
 // ══════════════════════════════════════════════════
 //  ATTACH BOT TO LOGGER
@@ -84,7 +74,6 @@ bot.on("message:successful_payment", async (ctx) => {
         const premiumPlan = starsService.PREMIUM_PLANS[itemId];
 
         if (coinPkg) {
-            // ─── Credit coins ─────────────────────
             user.coins += coinPkg.coins;
             user.totalEarned += coinPkg.coins;
             await user.save();
@@ -111,7 +100,6 @@ bot.on("message:successful_payment", async (ctx) => {
                 { parse_mode: "Markdown" }
             );
         } else if (premiumPlan) {
-            // ─── Grant premium ────────────────────
             const plan = itemId.replace("premium_", "");
             user.upgradePremium(plan);
             await user.save();
@@ -153,17 +141,14 @@ bot.catch(async (err) => {
     const ctx = err.ctx;
     const error = err.error;
 
-    // ─── 1. Log locally ─────────────────────────────
     logger.error(`[bot.catch] update ${ctx?.update?.update_id}: ${error?.message || error}`);
 
-    // ─── 2. Forward to ERRORS group ─────────────────
     try {
         await errorForwarder.forwardGlobalError(error, ctx);
     } catch (e) {
         logger.warn(`[bot.catch] forwarding failed: ${e.message}`);
     }
 
-    // ─── 3. Reply to user ───────────────────────────
     try {
         if (ctx && typeof ctx.reply === "function") {
             if (!ctx.__errorReplied) {
