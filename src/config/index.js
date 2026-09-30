@@ -3,6 +3,7 @@
 //  © BIGSTACK by bigmanjtech™ with ♥︎
 // ──────────────────────────────────────────────────
 
+// ─── Load all modules ───────────────────────────────
 const env = require("./env");
 const branding = require("./branding");
 const constants = require("./constants");
@@ -16,9 +17,6 @@ const permissions = require("./permissions");
 const forceJoin = require("./forceJoin");
 const reward = require("./reward");
 const webApp = require("./webApp");
-const sonicpesa = require("./sonicpesa");
-const payments = require("./payments");
-const api = require("./api");
 
 // ─── Master config ──────────────────────────────────
 const config = {
@@ -32,14 +30,18 @@ const config = {
     prefixes,
     siteMap,
     permissions,
-    forceJoin,
+
+    // ─── Force Join (spread raw + module helpers) ───
+    forceJoin: {
+        ...forceJoin.raw,
+        ...forceJoin,
+        raw: forceJoin.raw
+    },
+
     reward,
     webApp,
-    sonicpesa,
-    payments,
-    api,
 
-    // ─── Branding ───────────────────────────────────
+    // ─── Branding (top level) ───────────────────────
     branding: branding.branding,
     owner: branding.owner,
     bot: branding.bot,
@@ -58,6 +60,8 @@ const config = {
     locales: branding.locales,
     theme: branding.theme,
     ai: branding.ai,
+    payments: branding.payments,
+    sonicpesa: branding.sonicpesa,
 
     // ─── Quick flags ────────────────────────────────
     isDev: env.isDev,
@@ -66,15 +70,13 @@ const config = {
     footer: branding.branding.footer,
     name: branding.branding.name,
     tagline: branding.branding.tagline,
-
-    // ─── Shortcuts ──────────────────────────────────
     ownerId: env.ownerId,
     ownerUsername: branding.owner.username,
     botToken: env.botToken,
     botUsername: branding.bot.username,
     prefix: prefixes.default,
 
-    // ─── Helpers ────────────────────────────────────
+    // ─── Helper functions ───────────────────────────
     isEnabled(feature) {
         return branding.features?.[feature] === true;
     },
