@@ -1,110 +1,107 @@
 // ──────────────────────────────────────────────────
 //  BIGSTACK — /help Command
-//  Full command list in quote + list style
+//  Tappable commands in plain text (no buttons)
 //  © BIGSTACK by bigmanjtech™ with ♥︎
 // ──────────────────────────────────────────────────
+
+const path = require("path");
+const fs = require("fs");
+const { InputFile } = require("grammy");
 
 const config = require("../../config");
 const logger = require("../../core/logger");
 
 // ══════════════════════════════════════════════════
-//  Build help text ⏤ quote + list
+//  Build help text
 // ══════════════════════════════════════════════════
 function buildHelpText() {
     return (
-        `<b>◈ BIGSTACK — ALL COMMANDS</b>\n` +
-        `<blockquote>` +
+        `<b>◈ BIGSTACK — ALL COMMANDS</b>\n\n` +
+
         `<b>◇ DOWNLOADER · 18</b>\n` +
-        `• <code>/play</code> — YouTube audio\n` +
-        `• <code>/ytmp3</code> — YouTube → MP3\n` +
-        `• <code>/ytmp4</code> — YouTube → MP4\n` +
-        `• <code>/spotify</code> — Spotify track\n` +
-        `• <code>/spotifyplay</code> — Spotify search\n` +
-        `• <code>/applemusic</code> — Apple Music\n` +
-        `• <code>/soundcloud</code> — SoundCloud\n` +
-        `• <code>/instagram</code> — Instagram posts\n` +
-        `• <code>/tiktok</code> — TikTok videos\n` +
-        `• <code>/twitter</code> — Twitter / X\n` +
-        `• <code>/facebook</code> — Facebook videos\n` +
-        `• <code>/pinterest</code> — Pinterest pins\n` +
-        `• <code>/gdrive</code> — Google Drive\n` +
-        `• <code>/mediafire</code> — MediaFire\n` +
-        `• <code>/terabox</code> — Terabox\n` +
-        `• <code>/github</code> — GitHub repos\n` +
-        `• <code>/status</code> — Download status\n` +
-        `• <code>/cancel</code> — Cancel download\n` +
-        `</blockquote>\n\n` +
+        `• /play — YouTube audio\n` +
+        `• /ytmp3 — YouTube → MP3\n` +
+        `• /ytmp4 — YouTube → MP4\n` +
+        `• /spotify — Spotify track\n` +
+        `• /spotifyplay — Spotify search\n` +
+        `• /applemusic — Apple Music\n` +
+        `• /soundcloud — SoundCloud\n` +
+        `• /instagram — Instagram posts\n` +
+        `• /tiktok — TikTok videos\n` +
+        `• /twitter — Twitter / X\n` +
+        `• /facebook — Facebook videos\n` +
+        `• /pinterest — Pinterest pins\n` +
+        `• /gdrive — Google Drive\n` +
+        `• /mediafire — MediaFire\n` +
+        `• /terabox — Terabox\n` +
+        `• /github — GitHub repos\n` +
+        `• /status — Download status\n` +
+        `• /cancel — Cancel download\n\n` +
 
-        `<blockquote>` +
         `<b>◈ SEARCH · 9</b>\n` +
-        `• <code>/applesearch</code> — Apple Music\n` +
-        `• <code>/spotifysearch</code> — Spotify\n` +
-        `• <code>/youtubesearch</code> — YouTube\n` +
-        `• <code>/pinterestsearch</code> — Pinterest\n` +
-        `• <code>/imagesearch</code> — Images\n` +
-        `• <code>/lyrics</code> — Lyrics search\n` +
-        `• <code>/spotifylyric</code> — Spotify lyrics\n` +
-        `• <code>/happymod</code> — APK search\n` +
-        `• <code>/whatmusic</code> — Identify song\n` +
-        `</blockquote>\n\n` +
+        `• /applesearch — Apple Music\n` +
+        `• /spotifysearch — Spotify\n` +
+        `• /youtubesearch — YouTube\n` +
+        `• /pinterestsearch — Pinterest\n` +
+        `• /imagesearch — Images\n` +
+        `• /lyrics — Lyrics search\n` +
+        `• /spotifylyric — Spotify lyrics\n` +
+        `• /happymod — APK search\n` +
+        `• /whatmusic — Identify song\n\n` +
 
-        `<blockquote>` +
         `<b>★ CORE</b>\n` +
-        `• <code>/start</code> — Welcome\n` +
-        `• <code>/menu</code> — Main menu\n` +
-        `• <code>/help</code> — This list\n` +
-        `• <code>/about</code> — Bot info\n` +
-        `</blockquote>\n\n` +
+        `• /start — Welcome\n` +
+        `• /menu — Main menu\n` +
+        `• /help — This list\n` +
+        `• /about — Bot info\n\n` +
 
-        `<blockquote>` +
         `<b>☆ ECONOMY</b>\n` +
-        `• <code>/balance</code> — Coin balance\n` +
-        `• <code>/daily</code> — Claim daily coins\n` +
-        `• <code>/refer</code> — Invite friends\n` +
-        `• <code>/profile</code> — Your stats\n` +
-        `• <code>/store</code> — Buy coins\n` +
-        `• <code>/buy</code> — Mobile money\n` +
-        `</blockquote>\n\n` +
+        `• /balance — Coin balance\n` +
+        `• /daily — Claim daily coins\n` +
+        `• /refer — Invite friends\n` +
+        `• /profile — Your stats\n` +
+        `• /store — Buy coins\n` +
+        `• /buy — Mobile money\n\n` +
 
-        `<blockquote>` +
         `<b>◉ AI</b>\n` +
-        `• <code>/ai</code> — AI control center\n` +
-        `• <code>/aivoice</code> — Voice replies toggle\n` +
-        `</blockquote>\n\n` +
+        `• /ai — AI control center\n` +
+        `• /aivoice — Voice replies toggle\n\n` +
 
-        `<blockquote>` +
         `<b>⚙ SETTINGS</b>\n` +
-        `• <code>/settings</code> — Preferences\n` +
-        `• <code>/lang</code> — Change language\n` +
-        `• <code>/verify</code> — Verify join\n` +
-        `</blockquote>\n\n` +
+        `• /settings — Preferences\n` +
+        `• /lang — Change language\n` +
+        `• /verify — Verify join\n\n` +
 
-        `<blockquote>` +
         `<b>◈ SYSTEM</b>\n` +
-        `• <code>/ping</code> — Bot latency\n` +
-        `• <code>/alive</code> — Uptime check\n` +
-        `• <code>/runtime</code> — System stats\n` +
-        `• <code>/report</code> — Report a bug\n` +
-        `</blockquote>\n\n` +
+        `• /ping — Bot latency\n` +
+        `• /alive — Uptime check\n` +
+        `• /runtime — System stats\n` +
+        `• /report — Report a bug\n\n` +
 
-        `<blockquote>` +
-        `<b>🛡 ADMIN</b>\n` +
-        `• <code>/stats</code> — Bot statistics\n` +
-        `• <code>/broadcast</code> — Message all\n` +
-        `• <code>/pending</code> — Pending payments\n` +
-        `• <code>/approve</code> — Approve payment\n` +
-        `• <code>/reject</code> — Reject payment\n` +
-        `• <code>/ban</code> — Ban user\n` +
-        `• <code>/unban</code> — Unban user\n` +
-        `</blockquote>\n\n` +
-
-        `<b>▸ Tips</b>\n` +
-        `• Use <code>/menu</code> for buttons\n` +
-        `• Use <code>/help &lt;command&gt;</code> for details\n` +
-        `• Use <code>/report</code> to send bug reports\n\n` +
+        `<i>▸ Tap any /command above to run it</i>\n` +
+        `<i>▸ Use /menu for buttons</i>\n\n` +
 
         `<i>${config.footer}</i>`
     );
+}
+
+// ══════════════════════════════════════════════════
+//  Resolve banner (URL or local file)
+// ══════════════════════════════════════════════════
+function resolveBanner() {
+    const banner = config.branding?.banner || config.branding?.helpImage;
+    if (!banner) return null;
+
+    if (banner.startsWith("http://") || banner.startsWith("https://")) {
+        return banner;
+    }
+
+    const abs = path.resolve(__dirname, "../../", banner);
+    if (fs.existsSync(abs)) {
+        return new InputFile(abs);
+    }
+
+    return null;
 }
 
 // ══════════════════════════════════════════════════
@@ -131,22 +128,21 @@ module.exports = {
         logger.info(`[/help] ${ctx.from.id}`);
 
         const text = buildHelpText();
-        const helpImage =
-            config.branding?.helpImage || config.branding?.banner;
+        const banner = resolveBanner();
 
-        // ─── Try banner ─────────────────────────────
-        if (helpImage && helpImage.startsWith("http")) {
+        // ─── With banner ────────────────────────────
+        if (banner) {
             try {
-                return await ctx.replyWithPhoto(helpImage, {
+                return await ctx.replyWithPhoto(banner, {
                     caption: text,
                     parse_mode: "HTML"
                 });
             } catch (err) {
-                logger.warn(`[/help] image failed: ${err.message}`);
+                logger.warn(`[/help] banner failed: ${err.message}`);
             }
         }
 
-        // ─── Fallback: text only ────────────────────
+        // ─── Text only ──────────────────────────────
         await ctx.reply(text, { parse_mode: "HTML" });
     }
 };
