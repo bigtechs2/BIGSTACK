@@ -1,6 +1,11 @@
 // ──────────────────────────────────────────────────
 //  BIGSTACK — AI Chat Service
 //  © BIGSTACK by bigmanjtech™ with ♥︎
+//
+//  FIXED:
+//  - Format doesn't trigger "message cut off" bug
+//  - Filters 15+ refusal patterns
+//  - Auto-falls back to next provider
 // ──────────────────────────────────────────────────
 
 const axios = require("axios");
@@ -10,6 +15,7 @@ const { SYSTEM_PROMPT } = require("../../config/aiSystemPrompt");
 
 let preferredProvider = null;
 let preferredExpiry = 0;
+const PREFERRED_TTL = 5 * 60 * 1000;
 
 // ══════════════════════════════════════════════════
 //  Normalizers
@@ -38,46 +44,158 @@ function normalize(shape, data) {
 }
 
 // ══════════════════════════════════════════════════
-//  Prompt builder
+//  Prompt Builder ⏤ ULTRA SAFE
+//  Uses quotes + explicit "answer now" instruction
 // ══════════════════════════════════════════════════
 
-function buildPrompt(prompt, history = []) {
-    const parts = [SYSTEM_PROMPT, "", "══════════════════════", ""];
+function buildPrompt(userMessage, history = []) {
+    const clean = String(userMessage || "").trim();
 
-    if (Array.isArray(history) && history.length > 0) {
-        parts.push("## Conversation so far", "");
-        for (const msg of history.slice(-10)) {
-            const role = msg.role === "assistant" ? "BIGSTACK AI" : "User";
-            parts.push(`${role}: ${msg.content}`);
-        }
-        parts.push("");
+    if (!clean) {
+        return `${SYSTEM_PROMPT}\n\nUser sent empty message. Reply with a greeting.`;
     }
 
-    parts.push("## New message");
-    parts.push(`User: ${prompt}`);
-    parts.push("");
-    parts.push("BIGSTACK AI:");
+    // ═══════════════════════════════════════════════
+    //  NO HISTORY
+    // ═══════════════════════════════════════════════
+    if (!Array.isArray(history) || history.length === 0) {
+        return (
+            `${SYSTEM_PROMPT}\n\n` +
+            `════════════════════════════════════\n` +
+            `USER MESSAGE (complete, do not ask for more):\n` +
+            `"${clean}"\n` +
+            `════════════════════════════════════\n\n` +
+            `Reply now as BIGSTACK AI. Answer the question above directly.`
+        );
+    }
 
-    return parts.join("\n");
+    // ═══════════════════════════════════════════════
+    //  WITH HISTORY
+    // ═══════════════════════════════════════════════
+    const recent = history.slice(-4);
+
+    const contextLines = recent
+        .map((m) => {
+            const speaker = m.role === "assistant" ? "You" : "User";
+            const text = String(m.content || "").slice(0, 150);
+            return `${speaker} said: "${text}"`;
+        })
+        .join("\n");
+
+    return (
+        `${SYSTEM_PROMPT}\n\n` +
+        `Previous conversation:\n` +
+        `${contextLines}\n\n` +
+        `════════════════════════════════════\n` +
+        `NEW USER MESSAGE (complete, do not ask for more):\n` +
+        `"${clean}"\n` +
+        `════════════════════════════════════\n\n` +
+        `Reply now as BIGSTACK AI. Answer the NEW MESSAGE above directly.`
+    );
 }
 
 // ══════════════════════════════════════════════════
-//  Main chat
+//  Cleanup ⏤ Extended Filters
 // ══════════════════════════════════════════════════
 
-async function chat(prompt, history = []) {
-    if (!prompt || typeof prompt !== "string") throw new Error("Prompt is required");
+// ─── Bad patterns to reject ─────────────────────────
+const BAD_PATTERNS = [
+    // "Message cut off" family
+    "message got cut off",
+    "message cut off",
+    "message is incomplete",
+    "message seems incomplete",
+    "please complete your question",
+    "please complete your message",
+    "please continue your message",
+    "could you please continue",
+    "could you please complete",
+    "could you finish",
+    "please finish your question",
+    "finish your message",
+    "finish your question",
+    "your message was cut off",
+    "your message seems to be cut off",
+    "you started to ask",
+    "started to ask a question",
+    "it seems like you started",
+    "it seems like your message",
+    "i think you were about to",
+    "i'm not sure what you're trying to say",
+    "i'm not sure what you mean",
+    "i'm not sure what you are trying",
 
-    const fullPrompt = buildPrompt(prompt, history);
+    // Refusal family
+    "i am a large language model",
+    "i'm a large language model",
+    "i am an ai language model",
+    "i'm an ai language model",
+    "as an ai language model",
+    "as a large language model",
+    "i cannot fulfill your request",
+    "i can't fulfill your request",
+    "i cannot help with that",
+    "i'm unable to help",
+    "i am unable to help"
+];
+
+function isBadReply(text) {
+    if (!text || typeof text !== "string") return true;
+
+    const lower = text.toLowerCase().trim();
+
+    // Too short
+    if (lower.length < 2) return true;
+
+    // Check each bad pattern
+    for (const pattern of BAD_PATTERNS) {
+        if (lower.includes(pattern)) return true;
+    }
+
+    return false;
+}
+
+function cleanupReply(raw) {
+    if (!raw || typeof raw !== "string") return null;
+
+    let clean = raw.trim();
+
+    // ─── Remove role prefixes ────────────────────────
+    clean = clean.replace(/^(BIGSTACK AI|Assistant|AI)\s*:\s*/i, "");
+
+    // ─── Remove common wrappers ──────────────────────
+    clean = clean.replace(/^(Sure[!.,]?\s+)/i, "");
+    clean = clean.replace(/^(Of course[!.,]?\s+)/i, "");
+    clean = clean.replace(/^(Certainly[!.,]?\s+)/i, "");
+    clean = clean.replace(/^(Absolutely[!.,]?\s+)/i, "");
+
+    // ─── Reject bad replies ──────────────────────────
+    if (isBadReply(clean)) return null;
+
+    return clean;
+}
+
+// ══════════════════════════════════════════════════
+//  Main Chat
+// ══════════════════════════════════════════════════
+
+async function chat(userMessage, history = []) {
+    if (!userMessage || typeof userMessage !== "string") {
+        throw new Error("Message is required");
+    }
+
+    const fullPrompt = buildPrompt(userMessage, history);
     const providers = config.aiProviders?.chat || [];
 
-    // Prefer the last working provider
-    const ordered = preferredProvider && Date.now() < preferredExpiry
-        ? [
-            providers.find((p) => p.name === preferredProvider),
-            ...providers.filter((p) => p.name !== preferredProvider)
-          ].filter(Boolean)
-        : providers;
+    logger.info(`[ai] prompt: ${fullPrompt.length} chars ⏤ ${providers.length} providers`);
+
+    const ordered =
+        preferredProvider && Date.now() < preferredExpiry
+            ? [
+                  providers.find((p) => p.name === preferredProvider),
+                  ...providers.filter((p) => p.name !== preferredProvider)
+              ].filter(Boolean)
+            : providers;
 
     let lastError = null;
 
@@ -96,16 +214,24 @@ async function chat(prompt, history = []) {
                 timeout: provider.timeout || 30000
             });
 
-            const reply = normalize(provider.shape, data);
+            const rawReply = normalize(provider.shape, data);
+            const clean = cleanupReply(rawReply);
 
-            if (!reply || reply.length < 2) throw new Error("Empty response");
+            if (!clean) {
+                logger.warn(`[ai] ✗ ${provider.name}: bad reply detected`);
+                throw new Error("Bad or empty response");
+            }
 
             preferredProvider = provider.name;
-            preferredExpiry = Date.now() + 5 * 60 * 1000;
+            preferredExpiry = Date.now() + PREFERRED_TTL;
 
-            logger.info(`[ai] ✓ ${provider.name} (${reply.length} chars)`);
+            logger.info(`[ai] ✓ ${provider.name} replied (${clean.length} chars)`);
 
-            return { reply: reply.trim(), provider: provider.name, tier: provider.tier || 1 };
+            return {
+                reply: clean,
+                provider: provider.name,
+                tier: provider.tier || 1
+            };
 
         } catch (err) {
             const msg = err.response ? `HTTP ${err.response.status}` : err.message;
