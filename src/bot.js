@@ -1,10 +1,9 @@
+// ──────────────────────────────────────────────────
 //  BIGSTACK — Bot Instance
 //  © BIGSTACK by bigmanjtech™ with ♥︎
 // ──────────────────────────────────────────────────
 
 const { Bot } = require("grammy");
-const { autoRetry } = require("@grammyjs/auto-retry");
-
 const config = require("./config");
 const logger = require("./core/logger");
 const errorForwarder = require("./core/errorForwarder");
@@ -12,38 +11,65 @@ const errorForwarder = require("./core/errorForwarder");
 // ══════════════════════════════════════════════════
 //  CREATE BOT INSTANCE
 // ══════════════════════════════════════════════════
-
 const bot = new Bot(process.env.BOT_TOKEN, {
-    client: {
-        timeoutSeconds: 60
-    }
+    client: { timeoutSeconds: 60 }
 });
 
 bot.config = config;
 
 // ══════════════════════════════════════════════════
-//  PLUGINS
+//  RICH MESSAGE PLUGINS (defensive loading)
 // ══════════════════════════════════════════════════
 
-// ─── Auto-retry (rate limits) ───────────────────────
-bot.api.config.use(
-    autoRetry({
+// ─── 1. Auto-retry ──────────────────────────────────
+try {
+    const { autoRetry } = require("@grammyjs/auto-retry");
+    const retryMw = autoRetry({
         maxRetryAttempts: 3,
         maxDelaySeconds: 5
-    })
-);
+    });
+    if (typeof retryMw === "function") {
+        bot.api.config.use(retryMw);
+        logger.info("[bot] ✓ auto-retry loaded");
+    }
+} catch (e) {
+    logger.warn(`[bot] auto-retry not loaded: ${e.message}`);
+}
+
+// ─── 2. Parse mode ──────────────────────────────────
+try {
+    const { hydrateReply } = require("@grammyjs/parse-mode");
+    if (typeof hydrateReply === "function") {
+        bot.use(hydrateReply);
+        logger.info("[bot] ✓ parse-mode loaded");
+    }
+} catch (e) {
+    logger.warn(`[bot] parse-mode not loaded: ${e.message}`);
+}
+
+// ─── 3. Stream ──────────────────────────────────────
+try {
+    const { stream } = require("@grammyjs/stream");
+    const streamMw = stream();
+    if (typeof streamMw === "function") {
+        bot.use(streamMw);
+        logger.info("[bot] ✓ stream loaded");
+    } else {
+        logger.warn("[bot] stream() returned non-function ⏤ skipping");
+    }
+} catch (e) {
+    logger.warn(`[bot] stream not loaded: ${e.message}`);
+}
 
 // ══════════════════════════════════════════════════
 //  ATTACH BOT TO LOGGER
 // ══════════════════════════════════════════════════
-
 logger.attachBot(bot);
 
 // ══════════════════════════════════════════════════
 //  PAYMENT HANDLERS
 // ══════════════════════════════════════════════════
 
-// ─── Pre-checkout query ─────────────────────────────
 bot.on("pre_checkout_query", async (ctx) => {
     try {
         const starsService = require("./services/payment/stars.service");
@@ -54,7 +80,6 @@ bot.on("pre_checkout_query", async (ctx) => {
     }
 });
 
-// ─── Successful payment ─────────────────────────────
 bot.on("message:successful_payment", async (ctx) => {
     try {
         const User = require("./database/models/User");
@@ -136,7 +161,6 @@ bot.on("message:successful_payment", async (ctx) => {
 // ══════════════════════════════════════════════════
 //  GLOBAL ERROR HANDLER
 // ══════════════════════════════════════════════════
-
 bot.catch(async (err) => {
     const ctx = err.ctx;
     const error = err.error;
@@ -163,9 +187,5 @@ bot.catch(async (err) => {
         // User may have blocked the bot
     }
 });
-
-// ══════════════════════════════════════════════════
-//  EXPORT
-// ══════════════════════════════════════════════════
 
 module.exports = bot;
