@@ -1,6 +1,6 @@
 // ──────────────────────────────────────────────────
 //  BIGSTACK — /help Command
-//  Hardcoded banner + quoted lists + tappable commands
+//  Banner + text sent as TWO separate messages
 //  © BIGSTACK by bigmanjtech™ with ♥︎
 // ──────────────────────────────────────────────────
 
@@ -125,17 +125,21 @@ module.exports = {
 
         const text = buildHelpText();
 
-        // ─── Send with hardcoded banner ─────────────
+        // ─── 1. Send banner (no caption) ────────────
         try {
-            return await ctx.replyWithPhoto(HELP_BANNER, {
-                caption: text,
-                parse_mode: "HTML"
-            });
+            await ctx.replyWithPhoto(HELP_BANNER);
         } catch (err) {
             logger.warn(`[/help] banner failed: ${err.message}`);
         }
 
-        // ─── Fallback: text only ────────────────────
-        await ctx.reply(text, { parse_mode: "HTML" });
+        // ─── 2. Send help text ──────────────────────
+        try {
+            await ctx.reply(text, { parse_mode: "HTML" });
+        } catch (err) {
+            logger.error(`[/help] text failed: ${err.message}`);
+            // Fallback: strip HTML
+            const plain = text.replace(/<[^>]+>/g, "");
+            await ctx.reply(plain).catch(() => {});
+        }
     }
 };
