@@ -1,42 +1,23 @@
 // ──────────────────────────────────────────────────
 //  BIGSTACK — /testcmd Command
-//  Test if a command is valid (owner)
+//  Validate a command without saving (owner only)
 //  © BIGSTACK by bigmanjtech™ with ♥︎
 // ──────────────────────────────────────────────────
 
-const fs = require("fs");
-const path = require("path");
 const config = require("../../config");
 const logger = require("../../core/logger");
-const cmdManager = require("../../services/system/cmdManager.service");
+const validator = require("../../utils/cmdValidator");
 
 // ══════════════════════════════════════════════════
-//  Find command file by name
-// ══════════════════════════════════════════════════
-function findCommand(name) {
-    for (const category of cmdManager.ALLOWED_CATEGORIES) {
-        const filePath = path.join(
-            cmdManager.COMMANDS_DIR,
-            category,
-            `${name}.js`
-        );
-        if (fs.existsSync(filePath)) {
-            return { category, filePath };
-        }
-    }
-    return null;
-}
-
-// ══════════════════════════════════════════════════
-//  Command
+//  Main command
 // ══════════════════════════════════════════════════
 module.exports = {
     name: "testcmd",
-    aliases: ["checkcmd", "validatecmd"],
+    aliases: ["validatecmd", "checkcmd"],
     category: "utility",
-    description: "Test if a command works (owner)",
+    description: "Test a command script without saving it",
     emoji: "◈",
-    usage: "<command name>",
+    usage: "[reply to a script]",
 
     permissions: {
         coin: 0,
@@ -48,89 +29,67 @@ module.exports = {
     },
 
     code: async (ctx) => {
-        const target = ctx.args[0]?.replace(/^\//, "").toLowerCase();
+        const replied = ctx.message?.reply_to_message;
 
-        if (!target) {
+        if (!replied) {
             return ctx.reply(
                 `◈ *TEST COMMAND*\n\n` +
-                `▸ Usage: \`/testcmd <command>\`\n\n` +
-                `▸ Example: \`/testcmd play\``,
+                `▸ Reply to a script with /testcmd\n` +
+                `▸ Bot validates it without saving\n\n` +
+                `▸ Checks:\n` +
+                `   ➤ Syntax\n` +
+                `   ➤ Required fields\n` +
+                `   ➤ Category validity\n` +
+                `   ➤ Permission structure`,
                 { parse_mode: "Markdown" }
             );
         }
 
-        // ─── Find file ──────────────────────────────
-        const found = findCommand(target);
-        if (!found) {
+        const rawText = replied.text || replied.caption || "";
+        if (!rawText) {
+            return ctx.reply("✗  Replied message has no text.");
+        }
+
+        // ─── Validate ────────────────────────────────
+        const result = validator.validate(rawText);
+
+        if (!result.ok) {
+            const errors = result.errors.map((e) => `   ➤ ${e}`).join("\n");
             return ctx.reply(
-                `✗ *Command not found*\n\n` +
-                `▸ "/${target}" does not exist.`,
+                `✗ *INVALID*\n\n${errors}\n\n` +
+                `▸ Fix and try /testcmd again.`,
                 { parse_mode: "Markdown" }
             );
         }
 
-        // ─── Try to load ────────────────────────────
-        let cmd;
-        try {
-            delete require.cache[require.resolve(found.filePath)];
-            cmd = require(found.filePath);
-        } catch (err) {
-            return ctx.reply(
-                `✗ *Load failed*\n\n` +
-                `▸ Category ➤ ${found.category}\n` +
-                `▸ Error    ➤ \`${err.message}\``,
-                { parse_mode: "Markdown" }
-            );
-        }
+        // ─── Success ⏤ show metadata ────────────────
+        const m = result.meta;
 
-        // ─── Validate structure ─────────────────────
-        const issues = [];
-        if (!cmd.name) issues.push("Missing `name`");
-        if (typeof cmd.code !== "function") issues.push("Missing `code` function");
-        if (!cmd.category) issues.push("Missing `category`");
-        if (cmd.aliases && !Array.isArray(cmd.aliases))
-            issues.push("`aliases` must be array");
+        const aliases = m.aliases.length
+            ? m.aliases.map((a) => `/${a}`).join(", ")
+            : "none";
 
-        // ─── Build response ─────────────────────────
-        const perms = cmd.permissions || {};
+        const callbacks = m.callbacks > 0
+            ? `${m.callbacks} callback(s)`
+            : "none";
 
-        const permLines = [];
-        if (perms.coin)              permLines.push(`   ➤ Coin    ➤ ${perms.coin}`);
-        if (perms.owner)             permLines.push(`   ➤ Owner   ➤ ✓`);
-        if (perms.admin)             permLines.push(`   ➤ Admin   ➤ ✓`);
-        if (perms.premium)           permLines.push(`   ➤ Premium ➤ ✓`);
-        if (perms.group)             permLines.push(`   ➤ Group   ➤ ✓`);
-        if (perms.private)           permLines.push(`   ➤ Private ➤ ✓`);
-
-        const lines = [
-            `◈ *COMMAND INFO*`,
-            ``,
-            `▸ Name      ➤ \`/${cmd.name}\``,
-            `▸ Aliases   ➤ ${cmd.aliases?.length ? cmd.aliases.map((a) => "/" + a).join(", ") : "none"}`,
-            `▸ Category  ➤ ${cmd.category}`,
-            `▸ File      ➤ \`src/commands/${found.category}/${target}.js\``,
-            `▸ Desc      ➤ ${cmd.description || "—"}`,
-            ``
-        ];
-
-        if (permLines.length) {
-            lines.push(`◈ *Permissions*`);
-            lines.push(...permLines);
-            lines.push(``);
-        }
-
-        lines.push(`◈ *Status*`);
-        lines.push(
-            issues.length === 0
-                ? `   ✓ All checks passed`
-                : issues.map((i) => `   ✗ ${i}`).join("\n")
+        await ctx.reply(
+            `✓ *VALID COMMAND*\n\n` +
+            `▸ Name       ➤ \`/${m.name}\`\n` +
+            `▸ Aliases    ➤ ${aliases}\n` +
+            `▸ Category   ➤ ${m.category}\n` +
+            `▸ Emoji      ➤ ${m.emoji}\n` +
+            `▸ Description ➤ ${m.description || "—"}\n` +
+            `▸ Usage      ➤ ${m.usage || "—"}\n` +
+            `▸ Callbacks  ➤ ${callbacks}\n\n` +
+            `▸ Coin cost  ➤ ${m.permissions.coin || 0}\n` +
+            `▸ Owner only ➤ ${m.permissions.owner || false}\n` +
+            `▸ Admin only ➤ ${m.permissions.admin || false}\n` +
+            `▸ Premium    ➤ ${m.permissions.premium || false}\n\n` +
+            `▸ Use /addcmd to install it.`,
+            { parse_mode: "Markdown" }
         );
 
-        lines.push(``);
-        lines.push(`▸ ${config.footer}`);
-
-        logger.info(`[/testcmd] ${target} → ${issues.length} issue(s)`);
-
-        await ctx.reply(lines.join("\n"), { parse_mode: "Markdown" });
+        logger.info(`[/testcmd] ${ctx.from.id} validated: ${m.category}/${m.name}`);
     }
 };
