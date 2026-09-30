@@ -66,14 +66,14 @@
         "cacheMinutes": 2,
         "telegram": [
             {
-                "name": "BIGSTACK Channel",
-                "id": "@bigst4ckhub",
+                "name": "St4ck hub",
+                "id": "-1003990829602",
                 "url": "https://t.me/bigst4ckhub",
                 "type": "channel"
             },
             {
-                "name": "BIGSTACK Support",
-                "id": "@bigst4cksupport",
+                "name": "bigst4ck support",
+                "id": "-1003915101849",
                 "url": "https://t.me/bigst4cksupport",
                 "type": "group"
             }
